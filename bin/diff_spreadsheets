@@ -424,8 +424,7 @@ use File::Basename qw(basename dirname fileparse);
 use File::Path qw(make_path remove_tree);
 use File::Spec::Functions qw(catpath splitpath splitdir rootdir tmpdir);
 use List::Util qw(min max any first);
-use Spreadsheet::Edit qw(:DEFAULT logmsg);
-use Text::CSV::Spreadsheet qw(cx2let let2cx);
+use Spreadsheet::Edit qw(:DEFAULT logmsg cx2let let2cx);
 use Data::Dumper::Interp;
 sub oops(@) { unshift @_, "oops "; require Carp; goto &Carp::confess; }
 
