@@ -19,30 +19,26 @@ diff_spreadsheets - show differences between spreadsheets
 
 =head1 SYNOPSIS
 
-diff_spreadsheets [OPTIONS] file1 file2           # all sheets
+diff_spreadsheets [OPTIONS] file1.csv file2.xlsx!Sheet1 
 
-diff_spreadsheets [OPTIONS] 'file1!sheetname1' 'file2!sheetname2'
+diff_spreadsheets [OPTIONS] file1.xls file2.ods  # all coresponding sheets
 
 =head1 DESCRIPTION
 
 The files may be CSVs or any spreadsheet format supported by
 Gnumeric or Open/Libre Office (if you have them installed).
 
-If both contain only a single sheet (or are a CSV) then they are
-compared without regard to sheet names.
+If each input has only one sheet then they are compared regardless
+of sheet names.  Each file could be a .CSV, a spreadsheet workbook
+containing a single sheet, or a multi-sheet workbook with a
+sheet name specified (using the syntax shown).
 
-If a multi-sheet workbook is specified with a specific sheetname
-suffix (using the syntax shown), then the indicated sheet is used,
-regardless of sheet names.
-
-Otherwise, I<every> sheet contained in each file is comapred with the
-same-named sheet in the other file.  This feature is available
+Otherwise, I<every> sheet contained in each workbook is comapred with the
+same-named sheet in the other file, warning about any un-paired sheets.
+This feature is available
 only if the Gnumeric I<ssconvert> utility is installed.
 
-If one sheet contains fewer columns than the other then empty columns are
-appended to make them the same width.
-
-Tabs, newlines, etc. any non-printable characters are replaced with
+Tabs, newlines, etc. and non-printable characters are replaced with
 escapes like "\t" or "\n" for human consumption.
 
 =head1 OPTIONS
@@ -85,7 +81,7 @@ ignored when deciding if a row changed.
 
 COLSPEC may be a column title, a /regex/ or m{regex} matching a title,
 a column letter code (A, B, etc.), or an identifer
-as described in Spreadsheet::Edit.
+as described in L<Spreadsheet::Edit>.
 
 
 =head2 The following options apply only to the I<native> method:
@@ -102,16 +98,17 @@ as described in Spreadsheet::Edit.
 
 Specify columns which together uniquely identify records (i.e. rows).
 An error occurs if multiple rows exist in the same file with identical
-content in these columns.
+content in these columns.  
 
-When a pair of rows in the two files are identical in these
-columns, they are assumed to correspond, i.e. describe the same data item;
+This is used to recognized when a row is changed vs. added or deleted.
+
+When a pair of rows in the two files match in these columns,
 differences in other columns are reported as "changes" to the record.
 A row in the first file without a counterpart in the second file
 is reported as "deleted", and a row in the second file without a counterpart
 in the first is reported as "inserted".
 
-In detail: The Diff algorithm is applied using I<only> the C<id-column>s;
+Gory detail: The Diff algorithm is applied using I<only> the C<id-column>s;
 matching rows are assumed to correspond, and the other columns are
 then compared and a "change" is reported if there are differences.
 If --id-columns is not used, the Diff algorithm is applied using all
@@ -125,8 +122,9 @@ For even more control, see the B<--hashid-func> option.
 
 =head2 --always-show COLSPEC[,COLSPEC ...]
 
-When showing changed rows, always display these columns even if they
-are unchnaged.  Defaults to the same as --id-columns.
+By default only changed cells are displayed.  
+However cells from C<--always-show>, or if not specified then C<--id-columns>,
+are always shown even if unchanged.
 
 =head2 --hashid-func PERLCODE
 
@@ -151,7 +149,7 @@ and then I<hash-func> is used to determine if a corresponding pair has
 reportable changes.
 
 Specifically, I<hashid-func> is called for each row
-passing the values of columns given by C<--id-column> (or if
+passing values from C<--id-column> (or if
 not specified then all columns).  If undef is returned
 then that row is ignored.  If the same string is returned for a pair of
 rows from the two files then I<hash-func> is later used to determine if
@@ -190,7 +188,7 @@ All user-defined PERLCODE subs are compiled into the same package.
 
 =head2 --encoding ENCODING      (default is UTF-8)
 
-Used when reading CSV files (see Text::CSV).  The same options are
+Used when reading CSV files (see L<Text::CSV>).  The same options are
 applied to both input files.
 
 =head2 --quiet
@@ -213,7 +211,7 @@ not occur if gnumeric is installed, or when reading CSVs.
 
 =head1 SEE ALSO
 
-Spreadsheet::Edit, Text::CSV::Spreadsheet
+L<Spreadsheet::Edit>, L<Sreadsheet::Edit::IO>
 
 =head1 AUTHOR
 
