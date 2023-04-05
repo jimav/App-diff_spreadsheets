@@ -31,7 +31,7 @@ use lib "$ENV{HOME}/lib/perl";
 use Spreadsheet::Edit qw(title2ident);
 use Spreadsheet::Edit::IO qw/convert_spreadsheet 
              sheetname_from_spec filepath_from_spec form_spec_with_sheetname/;
-use Terminalsize qw/get_terminal_columns/;
+use Term::ReadKey ();
 sub oops(@) { unshift @_, "oops "; require Carp; goto &Carp::confess; }
 #$SIG{__WARN__} = sub{ Carp::cluck @_ };
 
@@ -87,7 +87,15 @@ sub badargs_exit(@) {
 #my $rightarrow = "\N{RIGHTWARDS ARROW}\N{NARROW NO-BREAK SPACE}";
 my $rightarrow = "\N{RIGHTWARDS ARROW}\N{HAIR SPACE}";
 
-my $maxwidth = get_terminal_columns;  # 0 or undef to not wrap long lines
+# 0 or undef to not wrap long lines
+my $maxwidth = do{
+  my $wmsg = ""; # Suppress hard-coded "didn't work" warning from Term::ReadKey 
+  local $SIG{'__WARN__'} = sub { $wmsg .= $_[0] };
+  my ($width, $height) = Term::ReadKey::GetTerminalSize(*STDOUT);
+  warn $wmsg if $wmsg && $wmsg !~ /did.*n.*work/i;
+  $width // 80
+};
+
 my %opts = (
   quote_char      => '"',
   sep_char        => ',',
