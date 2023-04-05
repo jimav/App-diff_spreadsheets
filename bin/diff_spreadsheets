@@ -28,12 +28,10 @@ use List::MoreUtils qw/indexes/;
 use Pod::Find qw/pod_where/;
 use Pod::Usage qw/pod2usage/;
 use lib "$ENV{HOME}/lib/perl";
-use Text::CSV::Spreadsheet qw(convert_spreadsheet
-                              sheetname_from_spec filepath_from_spec
-                              form_spec_with_sheetname);
 use Spreadsheet::Edit qw(title2ident);
+use Spreadsheet::Edit::IO qw/convert_spreadsheet 
+             sheetname_from_spec filepath_from_spec form_spec_with_sheetname/;
 use Terminalsize qw/get_terminal_columns/;
-use Vis;
 sub oops(@) { unshift @_, "oops "; require Carp; goto &Carp::confess; }
 #$SIG{__WARN__} = sub{ Carp::cluck @_ };
 
