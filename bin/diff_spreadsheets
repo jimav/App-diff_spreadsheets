@@ -37,19 +37,6 @@ use Vis;
 sub oops(@) { unshift @_, "oops "; require Carp; goto &Carp::confess; }
 #$SIG{__WARN__} = sub{ Carp::cluck @_ };
 
-sub call_pod2usage {
-  my $podpath = pod_where({-inc => 1},"App::diff_spreadsheets");
-  pod2usage($podpath ? (-input => $podpath) : (), @_);
-}
-
-=head1 SYNOPSYS
-
-*Could not locate documentation* 
-
-(App::diff_spreadsheets not in @INC ?!?)
-
-=cut
-
 sub main::Differ::compile_if_regex(@); #forward
 
 # Replace invalid/undesirable filename characters with underscore
@@ -70,9 +57,28 @@ sub decoded_readlink(_) {
 }
 
 #-------- Get Arguments ---------------
-sub badargs_exit(;$@) {
-  my $msg = (@_ > 0 ? (shift)."\n" : "")."$Script -h for help";
-  call_pod2usage(-msg => $msg, -exitval => 2, @_);
+sub call_pod2usage {
+  confess "bug" if (scalar(@_) % 2) != 0;
+  my %opts = @_;
+  if (! $opts{-msg}) {
+    if (my $podpath = pod_where({-inc => 1},"App::diff_spreadsheets")) {
+      $opts{-input} = $podpath;
+    } else {
+      warn "Could not find App::diff_spreadsheets in \@INC\n",
+           "\@INC:\n", join("\n   ",@INC), "\n";
+    }
+  }
+  pod2usage(\%opts);
+}
+
+=head1 SYNOPSYS
+
+*Could not locate documentation* 
+
+=cut
+
+sub badargs_exit(@) {
+  call_pod2usage(-output => \*STDERR, -exitval => 2, @_);
 }
 
 # We could use Term::Encoding to detect the terminal's encoding
@@ -94,7 +100,7 @@ my $method = "native";
 my @diff_opts;
 my $help;
 
-badargs_exit if @ARGV==0;
+badargs_exit(-msg => "Usage: $Script file1 file2\n   -h for help") if @ARGV==0;
 Getopt::Long::Configure ("default", "gnu_getopt", "auto_version");
 GetOptions(
    "always-show-columns=s"     => sub{ push @{$opts{always_show_columns}}, $_[1] },
@@ -156,8 +162,9 @@ GetOptions(
    "word-diff=s"               => sub{ push @diff_opts, "-$_[0]=$_[1]"; },
    "word-diff-regex=s"         => sub{ push @diff_opts, "-$_[0]=$_[1]"; },
    "ws-error-highlight=s"      => sub{ push @diff_opts, "-$_[0]=$_[1]"; },
-) or badargs_exit;
-call_pod2usage(-verbose => 2) if $help;
+) or badargs_exit(-msg => "$Script -h for help");
+
+call_pod2usage(-verbose => 2, -output => \*STDOUT) if $help;
 
 foreach (@diff_opts) { s/^-(\w\w+)/--$1/ }  # change -longopt to --longopt
 
@@ -182,7 +189,7 @@ $hashid_func_code //= sub{ Carp::cluck "bug" if grep{! defined} @{$_[0]}; join "
 $hash_func_code   //= sub{ Carp::cluck "bug" if grep{! defined} @{$_[0]}; join ",", @{$_[0]} };
 $setup_code_code  //= sub{};
 
-badargs_exit("Two files must be specified") if @ARGV != 2;
+badargs_exit(-msg => "Two files must be specified") if @ARGV != 2;
 $opts{origpath1} = $ARGV[0];
 $opts{origpath2} = $ARGV[1];
 

@@ -13,6 +13,8 @@ require Exporter;
 use parent 'Exporter';
 our @EXPORT = qw/silent/;
 
+use File::Spec ();
+
 # Do an initial read of $[ so arybase will be autoloaded
 # (prevents corrupting $!/ERRNO in subsequent tests)
 eval '$[' // die;
@@ -27,6 +29,7 @@ eval '$[' // die;
 # will appear at the end, perhaps long after the specific test case which
 # emitted the undesired output.
 my ($orig_stdOUT, $orig_stdERR);
+my ($fdhold_stdOUT, $fdhold_stdERR);
 my ($inmem_stdOUT, $inmem_stdERR) = ("", "");
 my $silent_mode;
 use Encode qw/decode FB_WARN FB_PERLQQ FB_CROAK LEAVE_SRC/;
@@ -35,24 +38,42 @@ sub _start_silent() {
   confess "nested silent treatments not supported" if $silent_mode;
   $silent_mode = 1;
 
-  my @OUT_layers = grep{ $_ ne "unix" } PerlIO::get_layers(*STDOUT, output=>1);
   open($orig_stdOUT, ">&", \*STDOUT) or die "dup STDOUT: $!";
+  exit(45) if $^O =~ /linux/ && fileno(STDOUT)!=1;
+
   close STDOUT;
+
+  # In-memory files do not use a Unix file descriptor, so
+  # open a dummy real file to avoid having fd 1 used elsewhere
+  # Unfortunately this is not enought to allow Capture::Tiny to work
+  # under :silent :-(
+  open($fdhold_stdOUT,">",File::Spec->devnull) or die;
+  exit(46) if $^O =~ /linux/ && fileno($fdhold_stdOUT)!=1;
+
   open(STDOUT, ">", \$inmem_stdOUT) or die "redir STDOUT: $!";
   binmode(STDOUT); binmode(STDOUT, ":utf8");
 
-  my @ERR_layers = grep{ $_ ne "unix" } PerlIO::get_layers(*STDERR, output=>1);
   open($orig_stdERR, ">&", \*STDERR) or die "dup STDERR: $!";
+  exit(47) if $^O =~ /linux/ && fileno(STDERR)!=2;
+
   close STDERR;
+
+  open($fdhold_stdERR,">",File::Spec->devnull) or die;
+  exit(48) if $^O =~ /linux/ && fileno($fdhold_stdERR)!=2;
+
   open(STDERR, ">", \$inmem_stdERR) or die "redir STDERR: $!";
   binmode(STDERR); binmode(STDERR, ":utf8");
 }
 sub _finish_silent() {
   confess "not in silent mode" unless $silent_mode;
   close STDERR;
+  close $fdhold_stdERR;
   open(STDERR, ">>&", $orig_stdERR) or exit(198);
+  exit(51) if $^O =~ /linux/ && fileno(STDERR)!=2;
   close STDOUT;
+  close $fdhold_stdOUT;
   open(STDOUT, ">>&", $orig_stdOUT) or die "orig_stdOUT: $!";
+  exit(52) if $^O =~ /linux/ && fileno(STDOUT)!=1;
   $silent_mode = 0;
   # The in-memory files hold octets; decode them before printing
   # them out (when they will be re-encoded for the user's terminal).
@@ -140,7 +161,6 @@ sub import {
   require List::Util;
   List::Util->import::into($target, qw/reduce min max first/);
 
-  require File::Spec;
  
   require Scalar::Util;
   Scalar::Util->import::into($target, qw/blessed reftype looks_like_number
