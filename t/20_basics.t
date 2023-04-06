@@ -1,9 +1,10 @@
 #!/usr/bin/env perl
 use FindBin qw($Bin);
 use lib $Bin;
+use t_Common qw/oops/; # strict, warnings, Carp
+use t_TestCommon qw/bug/; # Test::More etc.
 # N.B. Can not use :silent because it breaks Capture::Tiny
-use t_Setup ; # strict, warnings, Test::More, Carp etc.
-use t_Utils qw/oops bug check checkeq_literal/;
+
 use Capture::Tiny qw/capture/;
 
 my $tlib = "$Bin/../tlib";
