@@ -2,7 +2,7 @@
 use FindBin qw($Bin);
 use lib $Bin;
 use t_Common qw/oops/; # strict, warnings, Carp
-use t_TestCommon qw/bug/; # Test::More etc.
+use t_TestCommon qw/bug run_perlscript/; # Test::More etc.
 # N.B. Can not use :silent because it breaks Capture::Tiny
 
 use Capture::Tiny qw/capture/;
@@ -14,7 +14,7 @@ my $progpath = "$Bin/../bin/$progname";
 
 sub runtest($$$$$$) {
   my ($in1, $in2, $exp_out, $exp_err, $exp_exit, $desc) = @_;
-  my ($out, $err, $wstat) = capture{ system $progpath, $in1, $in2 };
+  my ($out, $err, $wstat) = capture{ run_perlscript $progpath, $in1, $in2 };
   my @m;
   if (ref $exp_out) {
     push @m, "stdout wrong (!~ $exp_out)" if $out !~ /$exp_out/;

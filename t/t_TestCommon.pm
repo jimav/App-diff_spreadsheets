@@ -39,6 +39,7 @@ our @EXPORT = qw/silent
                  fmt_codestring 
                  timed_run
                  checkeq_literal check _check_end
+                 run_perlscript
                 /;
 our @EXPORT_OK = qw/$debug $silent $verbose @quotes/;
 
@@ -84,9 +85,6 @@ sub import {
   Test::More->VERSION('0.98'); # see UNIVERSAL
   Test::More->import::into($target);
 
-  # Propagate effect of -I... to any sub-scripts which are run
-  $ENV{PERL5LIB} = join(":", @INC);
-
   if (grep{ $_ eq ':silent' } @_) {
     @_ = grep{ $_ ne ':silent' } @_;
     _start_silent();
@@ -94,6 +92,22 @@ sub import {
 
   # chain to Exporter to export any other importable items
   goto &Exporter::import
+}
+
+# Run a Perl script in a sub-process.
+# Plain 'system  path/to/script.pl' does not work in a test environment
+# where the correct Perl executable is not at the front of PATH,
+# and also where -I options might supply library paths.
+# This is usually enclosed in Capture { ... }
+sub run_perlscript(@) {
+  my @cmd = @_;
+  VERIF:
+  { open my $fh, "<", $cmd[0] or die "$cmd[0] : $!";
+    while (<$fh>) { last VERIF if /^\s*use\s+(?:warnings|\w+::)/; }
+    confess "$cmd[0] does not appear to be a Perl script";
+  }
+  local $ENV{PERL5LIB} = join(":", @INC);
+  system $^X, @cmd;
 }
 
 # N.B. It appears, experimentally, that output from ok(), like() and friends
@@ -111,6 +125,8 @@ my $silent_mode;
 use Encode qw/decode FB_WARN FB_PERLQQ FB_CROAK LEAVE_SRC/;
 sub _finish_silent() {
   confess "not in silent mode" unless $silent_mode;
+Test::More::diag("Silent mode DISABLED in ",__FILE__);
+return;
   close STDERR;
   open(STDERR, ">>&", $orig_stdERR) or exit(198);
   close STDOUT;
@@ -135,6 +151,9 @@ sub _finish_silent() {
 sub _start_silent() {
   confess "nested silent treatments not supported" if $silent_mode;
   $silent_mode = 1;
+
+Test::More::diag("Silent mode DISABLED in ",__FILE__);
+return;
 
   $orig_DIE_trap = $SIG{__DIE__};
   $SIG{__DIE__} = sub{ 
