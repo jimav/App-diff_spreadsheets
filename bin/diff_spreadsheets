@@ -12,7 +12,10 @@ use strict; use warnings FATAL => 'all'; use 5.010;
 # POD HAS BEEN MOVED TO THE STUB LIBRARY App::diff_spreadsheets.pm
 ######################################################################
 
-use strict; use warnings; use feature qw(switch state say);
+use strict; use warnings; 
+use feature qw(switch state say lexical_subs);
+no warnings "experimental::lexical_subs";
+
 use Carp; $Carp::MaxArgNums = 0;
 use Data::Dumper::Interp;
 use File::Basename qw(basename dirname fileparse);
@@ -538,11 +541,11 @@ sub new {
   my %hash = @_;
   warn __PACKAGE__,"->new",hvis(%hash),"\n" if $hash{debug};
 
-  #my @sheet_new_opts = ($hash{debug} ? (debug => 1) : (silent => 1)); # no alias warnings
-  my @sheet_new_opts = ($hash{debug} ? (verbose => 1) : (silent => 1)); # no alias warnings
+  $hash{always_show_columns} //= $hash{id_columns};
+
   my @columns = @{ $hash{columns} // [] }; # copy; will be mutated
+  my $always_show_columns = $hash{always_show_columns} // [];
   my $id_columns = $hash{id_columns} // [];
-  my $always_show_columns = $hash{always_show_columns} // $id_columns;
   my $negated;
   if (@columns) {
     $negated = $columns[0] =~ s/^-//;
@@ -552,6 +555,7 @@ sub new {
         unless s/^-// == $negated;
     }
   }
+  my @sheet_new_opts = ($hash{debug} ? (verbose => 1) : (silent => 1)); # no alias warns
   for my $N (1, 2) {
     # Read into memory
     my $path = $hash{"path$N"} // confess "'path$N' option is required";
@@ -787,11 +791,11 @@ sub compare_native {
     }
 ##    $self->preprocess_titles($sh);
   }
-  local *_titlerow_msg = sub {
+  my sub _titlerow_msg {
     my $sh = shift;
     my $rx = $sh->title_rx;
     defined($rx) ? "--title-row ".($rx+1) : "NO --title-row"
-  };
+  }
   if (!defined($self->{title_row})) {
     if ($self->{verbose}) {
       if (u($self->{sheet1}->title_rx) eq u($self->{sheet2}->title_rx)) {
@@ -878,27 +882,22 @@ sub compare_native {
         if ($cx1 > $cx2) { $j++ } else { $i++ }
       }
     }
-###TEMP DEBUG
-{ #append [cx] to titles
-  if ($have_titles) {
-    for my $i (0..$#corresp_titles) {
-      my $cx1 = $corresp_cxlist1[$i];
-      my $cx2 = $corresp_cxlist2[$i];
-      if ($cx1==$cx2) {
-        $corresp_titles[$i] .= "[".cx2let($cx1)."=$cx1]";
-      } else {
-        $corresp_titles[$i] .= "[".cx2let($cx1)."=$cx1/".cx2let($cx2)."=$cx2]";
-      }
-    }
-  }
-}
+####TEMP DEBUG
+#{ #append [cx] to titles
+#  if ($have_titles) {
+#    for my $i (0..$#corresp_titles) {
+#      my $cx1 = $corresp_cxlist1[$i];
+#      my $cx2 = $corresp_cxlist2[$i];
+#      if ($cx1==$cx2) {
+#        $corresp_titles[$i] .= "[".cx2let($cx1)."=$cx1]";
+#      } else {
+#        $corresp_titles[$i] .= "[".cx2let($cx1)."=$cx1/".cx2let($cx2)."=$cx2]";
+#      }
+#    }
+#  }
+#}
     die "bug" unless @corresp_cxlist1 == @corresp_cxlist2;
     die "bug" unless @corresp_cxlist1 == @corresp_titles;
-#    for my $sh ($self->{sheet1}, $self->{sheet2}) {
-#      $sh->attributes->{CORRESP_TITLES  } = \@corresp_titles;
-#      $sh->attributes->{CORRESP_CXLIST  } = \@corresp_cxlist1;
-#      $sh->attributes->{UNPAIRED_CXLIST } = \@unpaired_cxlist1;
-#    }
 
     { my $sh1 = $self->{"sheet1"};
       $sh1->attributes->{CORRESP_TITLES  } = \@corresp_titles;
@@ -947,6 +946,7 @@ sub compare_native {
   # save information in globals (declared with "our") for later use
   # by hashid-func or hash-func.  All these user-defined functions
   # are compiled into package Usercode.
+  # TODO: Should this be moved before all the setup above?
   $setup_code_code->( $self->{"sheet1"},
                       $self->{"sheet2"},
                       \@idcxlist1,
@@ -1149,10 +1149,10 @@ sub show_row {
   my ($self, $N, $row, $orig_rx, $comment, $dumbrun) = @_; oops if @_ != 6;
   my $sh = $self->{"sheet$N"};
   print "$comment ", fmt_rownum($orig_rx), ":\n" unless $dumbrun;
-  local *ABC_label = sub {
+  my sub ABC_label {
     my $cx = shift;
     defined($sh->title_rx()) ? "(".cx2origlet($sh,$cx).")" : cx2let($cx);
-  };
+  }
   my $title_rx = $sh->title_rx;
   my $corresp_titles  = $sh->attributes->{CORRESP_TITLES};
   my $always_show     = $sh->attributes->{ALWAYS_SHOW};
@@ -1222,7 +1222,7 @@ sub diff_rows {
   }
   # "Singleton" columns have no corresponding column in the other sheet.
   # Show their cells only if not empty because they don't actually represent
-  # different content except where such columns contain something.
+  # different content except when they contain something.
   my $title1_row = $sheet1->title_row;
   for my $cx1 (@{ $sheet1->attributes->{UNPAIRED_CXLIST} }) {
     if ((my $content = $row1->[$cx1]) ne "") {
