@@ -73,7 +73,25 @@ sub call_pod2usage {
 
 =head1 SYNOPSYS
 
-*Could not locate documentation* 
+Documentation is not here in the executable script!
+
+If you are seeing this, most likely you ran `perldoc diff_spreadsheets`
+or something equivalent.
+To see the documentation, please run
+
+=over
+
+B<diff_spreadsheets -h>
+
+=back
+
+or
+
+=over
+
+B<perldoc [options] App::diff_spreadsheets>
+
+=back
 
 =cut
 
@@ -99,6 +117,7 @@ my $maxwidth = do{
 };
 
 my %opts = (
+  sort_rows       => 1,
   quote_char      => '"',
   sep_char        => ',',
   encoding        => 'UTF-8',
@@ -115,6 +134,10 @@ GetOptions(
    "a|text"                    => sub{ push @diff_opts, "-$_[0]"; },
    "B|ignore-blank-lines"      => sub{ push @diff_opts, "-$_[0]"; },
    "b|ignore-space-change"     => sub{ push @diff_opts, "-$_[0]"; },
+
+   # --color is valid only for 'git diff'
+   "color=s"                   => sub{ push @diff_opts, "-$_[0]=$_[1]"; },
+
    "columns=s"                 => sub{ push @{$opts{columns}}, $_[1] },
    "c|C|context=i"             => sub{ push @diff_opts, "-$_[0]", $_[1]; },
    "debug"                     => sub{ $opts{debug} = $_[1] },
@@ -123,6 +146,7 @@ GetOptions(
    "encoding=s"                => sub{ $opts{encoding} = $_[1] },
    "e|ed"                      => sub{ push @diff_opts, "-$_[0]"; },
    "E|ignore-tab-expansion"    => sub{ push @diff_opts, "-$_[0]"; },
+   "first-data-row=i"          => sub{ $opts{first_data_row} = $_[1] },
    "F|show-function-line=s"    => sub{ push @diff_opts, "-$_[0]", $_[1]; },
    "GTYPE-group-format=s"      => sub{ push @diff_opts, "-$_[0]", $_[1]; },
    "hash-func=s"               => sub{ $opts{hash_func} = $_[1] },
@@ -147,10 +171,10 @@ GetOptions(
    "setup-code=s"              => sub{ $opts{setup_code} = $_[1] },
    "sheets=s"                  => sub{ push @{$opts{sheet_names}}, $_[1] },
    "show-empties"              => sub{ $opts{show_empties} = $_[1] },
+   "sort-rows!"                => sub{ $opts{sort_rows} = $_[1] }, # allow --no-sort
    "speed-large-files"         => sub{ push @diff_opts, "-$_[0]"; },
    "strip-trailing-cr"         => sub{ push @diff_opts, "-$_[0]"; },
-   "suppress-common-lines"     => sub{ $opts{suppress_common_lines} = 1;
-                                       push @diff_opts, "-$_[0]"; },
+   "suppress-common-lines"     => sub{ $opts{suppress_common_lines} = 1; push @diff_opts, "-$_[0]"; },
    "s|report-identical-files"  => sub{ push @diff_opts, "-$_[0]"; },
    "tabsize=i"                 => sub{ push @diff_opts, "-$_[0]", $_[1]; },
    "title-row=i"               => sub{ $opts{title_row} = $_[1] },
@@ -158,18 +182,17 @@ GetOptions(
    "T|initial-tab"             => sub{ push @diff_opts, "-$_[0]"; },
    "u|U|unified:i"             => sub{ push @diff_opts, "-$_[0]", $_[1]?($_[1]):(); },
    "v|verbose"                 => sub{ $opts{verbose} = $_[1] },
-   "w|ignore-all-space"        => sub{ push @diff_opts, "-$_[0]"; },
-   "W|width=i"                 => sub{ $maxwidth = $_[1];
-                                       push @diff_opts, "-$_[0]", $_[1]; },
-   "y|side-by-side"            => sub{ push @diff_opts, "-$_[0]"; },
-   "Z|ignore-trailing-space"   => sub{ $opts{ign_trailing_spaces} = 1;
-                                       push @diff_opts, "-$_[0]"; },
 
-   # Options valid only for 'git diff':
-   "color=s"                   => sub{ push @diff_opts, "-$_[0]=$_[1]"; },
-   "word-diff=s"               => sub{ push @diff_opts, "-$_[0]=$_[1]"; },
+   # valid only for 'git diff':
    "word-diff-regex=s"         => sub{ push @diff_opts, "-$_[0]=$_[1]"; },
+   "word-diff=s"               => sub{ push @diff_opts, "-$_[0]=$_[1]"; },
    "ws-error-highlight=s"      => sub{ push @diff_opts, "-$_[0]=$_[1]"; },
+
+   "w|ignore-all-space"        => sub{ push @diff_opts, "-$_[0]"; },
+   "W|width=i"                 => sub{ $maxwidth = $_[1]; push @diff_opts, "-$_[0]", $_[1]; },
+   "y|side-by-side"            => sub{ push @diff_opts, "-$_[0]"; },
+   "Z|ignore-trailing-space"   => sub{ $opts{ign_trailing_spaces} = 1; push @diff_opts, "-$_[0]"; },
+   # Options valid only for 'git diff':
 ) or badargs_exit(-msg => "$Script -h for help");
 
 call_pod2usage(-verbose => 2, -output => \*STDOUT) if $help;
@@ -532,7 +555,7 @@ sub __visualize($) {
 #  For each in {always_show_columns} and {id_columns} :
 #    alias <uniqueident> to the column and set
 #      $sheet->attributes->{TRACKING}{ spec => [list of <uniqueident>] }
-#      (each might be a regex matching multiple values).
+#      (each 'spec' might be a regex matching multiple values).
 #
 #  Set attributes->{DELETED_CXS} => [ original cxs ]
 #
@@ -617,6 +640,35 @@ sub new {
           oops unless $sh->colx->{$aliaslist[$_]} == $cxlist[$_];
         }
       }
+    }
+    
+    # Pre-sort the files
+    if (@$id_columns && $hash{sort_rows}) {
+
+      my $title_rx = $sh->title_rx;
+      $sh->first_data_rx(defined($hash{first_data_row})
+                          ? ($hash{first_data_row}-1)
+                          : (($title_rx // -1) + 1));
+
+      # FIXME? Can the "Translate --always-show and --id-columns to cx..."
+      # be hoisted up here from compare_native()?  Maybe not because
+      # that has to be done after deleting ignored columns (otoh maybe we can
+      # sort after deleting?)  For now, repeating code from there...
+      my @key_cxs = map{
+                      map{ $sh->colx->{$_} // oops } 
+                      @{ $sh->attributes->{TRACKING}->{ $_ } // oops }
+                    }
+                    @{$hash{id_columns}} ;
+
+      $sh->attributes->{ORIGINAL_RXS} = [
+        $sh->sort_rows(sub{
+          foreach my $cx (@key_cxs) {
+            my $r = $a->[$cx] cmp $b->[$cx];
+            return $r if $r;
+          }
+          0
+        })
+      ];
     }
 
     # Remove columns not being compared
@@ -825,8 +877,10 @@ sub compare_native {
     if ($have_titles) {
       # (N.B. As of 4/24/16 only both or neither can have titles)
       for my $cx1 (0 .. ($self->{sheet1}->num_cols-1)) {
+        oops dvis '$cx1 $title_row1' if $cx1 > $#{$title_row1};
         my $title = $title_row1->[$cx1];
-        if ($title ne "" && defined (my $cx2 = $self->{sheet2}->colx->{$title})) {
+        if ($title ne "" 
+              && defined (my $cx2 = $self->{sheet2}->colx->{$title})) {
           push @corresp_titles, $title;
           push @corresp_cxlist1, $cx1;
           push @corresp_cxlist2, $cx2;
@@ -843,7 +897,8 @@ sub compare_native {
       }
       for my $cx2 (0 .. ($self->{sheet2}->num_cols-1)) {
         my $title = $title_row2->[$cx2];
-        if ($title ne "" && defined (my $cx1 = $self->{sheet1}->colx->{$title})) {
+        if ($title ne "" 
+              && defined (my $cx1 = $self->{sheet1}->colx->{$title})) {
           if (! any{ $_ == $cx2 } @corresp_cxlist2) {
             push @corresp_titles, $title;
             push @corresp_cxlist1, $cx1;
@@ -987,6 +1042,8 @@ sub compare_native {
       push @{ $diffargs[$N-1] }, $diffitem if defined($keygen->($diffitem));
     }
   }
+
+  warn dvis '$diffargs[0]\n$diffargs[1]\n' if $self->{debug};
 
   my $diff = Algorithm::Diff->new(
     $diffargs[0],
@@ -1146,8 +1203,9 @@ sub fmt_rownum($;$) {
 }
 sub show_row {
   #my ($self, $N, $rx, $comment, $dumbrun) = @_; oops if @_ != 5;
-  my ($self, $N, $row, $orig_rx, $comment, $dumbrun) = @_; oops if @_ != 6;
+  my ($self, $N, $row, $curr_rx, $comment, $dumbrun) = @_; oops if @_ != 6;
   my $sh = $self->{"sheet$N"};
+  my $orig_rx = $sh->attributes->{ORIGINAL_RXS}->[$curr_rx] // $curr_rx;
   print "$comment ", fmt_rownum($orig_rx), ":\n" unless $dumbrun;
   my sub ABC_label {
     my $cx = shift;
@@ -1156,7 +1214,7 @@ sub show_row {
   my $title_rx = $sh->title_rx;
   my $corresp_titles  = $sh->attributes->{CORRESP_TITLES};
   my $always_show     = $sh->attributes->{ALWAYS_SHOW};
-  my %notseen = map{ ($_=>1) } (0.._getncols($sh,$orig_rx)-1);
+  my %notseen = map{ ($_=>1) } (0.._getncols($sh,$curr_rx)-1);
   my $all_empty = 1;
 
   for my $show_always_shown (1, 0) { # Show --id-columns etc. first
@@ -1167,7 +1225,7 @@ sub show_row {
         next if ((!$always_show->{$cx}) ^ (!$show_always_shown));
         my $value = $row->[$cx];
         if ($value ne "" || $self->{show_empties} || $always_show->{ $cx }) {
-          my $label = $orig_rx <= ($title_rx//-1)
+          my $label = $curr_rx <= ($title_rx//-1)
                ? ABC_label($cx) : $corresp_titles->[$i];
           $self->show_cell($label, $value, undef, $dumbrun);
           $all_empty = 0;
@@ -1192,7 +1250,9 @@ sub diff_rows {
   my ($self, $rx1, $rx2, $comment, $dumbrun) = @_;
   oops unless @_ == 5;
   my ($sheet1, $sheet2) = @$self{qw/sheet1 sheet2/};
-  my $headerline = "$comment ".fmt_rownum($rx1,$rx2).":\n";
+  my $orig_rx1 = $sheet1->attributes->{ORIGINAL_RXS}->[$rx1] // $rx1;
+  my $orig_rx2 = $sheet2->attributes->{ORIGINAL_RXS}->[$rx2] // $rx2;
+  my $headerline = "$comment ".fmt_rownum($orig_rx1,$orig_rx2).":\n";
   my $header_printed = $dumbrun; #suppress during dumb run
   my $row1 = $sheet1->[$rx1] // die "BUG: Undef row in sheet1 at rx1=$rx1\n";
   my $row2 = $sheet2->[$rx2] // die "BUG: Undef row in sheet2 at rx2=$rx2\n";

@@ -1,3 +1,9 @@
+# License: Public Domain or CC0
+# See https://creativecommons.org/publicdomain/zero/1.0/
+# The author, Jim Avera (jim.avera at gmail) has waived all copyright and 
+# related or neighboring rights to the content of this file.  
+# Attribution is requested but is not required.
+
 package App::diff_spreadsheets;
 
 # DATE
@@ -15,7 +21,7 @@ __END__
 
 =head1 NAME
 
-diff_spreadsheets - show differences between spreadsheets
+diff_spreadsheets - show differences between spreadsheets/csvs readably
 
 =head1 SYNOPSIS
 
@@ -47,11 +53,13 @@ escapes like "\t" or "\n" for human consumption.
 
 I<native> (the default) shows only the changed I<cells> in rows which
 differ.   Corresponding columns are identified by title,
-and need not be in the same order (see also the C<--id-columns> option).
+and need not be in the same order 
+(see also C<--id-columns>).
 
-I<diff>, and I<tkdiff> run the indicated external tool on
+I<diff>, I<tkdiff>, I<git>, or I<gitchars> run an external tool on
 temporary text (CSV) files created from the inputs, in which ignored columns
 have been removed and non-graphic characters changed to escapes.
+
 Most diff(1) options are accepted and passed through, but are not
 documented here.
 
@@ -83,32 +91,40 @@ COLSPEC may be a column title, a /regex/ or m{regex} matching a title,
 a column letter code (A, B, etc.), or an identifer
 as described in L<Spreadsheet::Edit>.
 
+=head2 --id-columns COLSPEC[,COLSPEC ...] 
+
+Specify columns which together uniquely B<identify records> (i.e. rows).
+
+Before running any "diff" operation, the data rows in each file are
+sorted using the specified columns as sort keys in the order given 
+(comparison is alphabetic).
+This puts corresponding rows in the same relative vertical position
+in each file, making it more likely that a change to a record 
+is detected as a CHANGE and not as confusing separate DELETE and INSERT.
+
+B<C<--no-sort-rows>> disables this sorting so you can pre-sort the
+data yourself (for example, if "id columns" should be sorted
+numerically).
+
+When using the default "native" diff algorithm, the I<original>
+row numbers in each file are displayed in the results. 
 
 =head2 The following options apply only to the I<native> method:
 
-=head2
+  
 
-=head2 Differences are reported in one of three ways:
+=head2 --always-show COLSPEC[,COLSPEC ...]
 
-  1) An existing row was changed;
-  2) A new row was inserted; or
-  3) A existing row was deleted.
+By default, when a changed row is displayed the changed cells are shown
+plus all cells implied by C<--id-columns> whether changed or not.
 
-=head2 --id-columns COLSPEC[,COLSPEC ...]
+The C<--always-show> option supplies an alternative set of columns
+to always show instead of those given by C<--id-columns>.  The input
+data is still sorted using C<--id-columns>.
 
-Specify columns which together uniquely identify records (i.e. rows).
-An error occurs if multiple rows exist in the same file with identical
-content in these columns.  
+=head2 Gory internals of the native diff method
 
-This is used to recognized when a row is changed vs. added or deleted.
-
-When a pair of rows in the two files match in these columns,
-differences in other columns are reported as "changes" to the record.
-A row in the first file without a counterpart in the second file
-is reported as "deleted", and a row in the second file without a counterpart
-in the first is reported as "inserted".
-
-Gory detail: The Diff algorithm is applied using I<only> the C<id-column>s;
+The Diff algorithm is first applied using I<only> the C<id-column>s;
 matching rows are assumed to correspond, and the other columns are
 then compared and a "change" is reported if there are differences.
 If --id-columns is not used, the Diff algorithm is applied using all
@@ -119,12 +135,6 @@ the result can be a string of "changed" reports which
 actually describe pairs of unrelated records.
 
 For even more control, see the B<--hashid-func> option.
-
-=head2 --always-show COLSPEC[,COLSPEC ...]
-
-By default only changed cells are displayed.  
-However cells from C<--always-show>, or if not specified then C<--id-columns>,
-are always shown even if unchanged.
 
 =head2 --hashid-func PERLCODE
 
@@ -145,22 +155,24 @@ Both default to
 
 During the Diff algorithm, I<hashid-func> is used to identify
 pairs of rows which represent the same data record,
-and then I<hash-func> is used to determine if a corresponding pair has
+and then I<hash-func> is used to determine if a pair has
 reportable changes.
 
-Specifically, I<hashid-func> is called for each row
-passing values from C<--id-column> (or if
+Specifically: I<hashid-func> is called for each row
+passing only values from C<--id-column> (or if
 not specified then all columns).  If undef is returned
 then that row is ignored.  If the same string is returned for a pair of
 rows from the two files then I<hash-func> is later used to determine if
-there are reportable changes.  If a unique string is returned,
+there are reportable changes.  If a unique string is returned 
+by I<hashid_func>,
 i.e. there is no corresponding row in the other file, then that row
 will be reported as "deleted" or "inserted" and I<hash-func> is not
 used for that row.
 
-When I<hash-func> is called, it is passed I<all> cells in a row (or those
+When I<hash-func> is called (i.e. when a pair of corresponding rows has
+been identified), it is passed I<all> cells in a row (or those
 specified with C<--columns>).  If the result is different for
-corresponding rows then a single "change" is reported.
+corresponding rows then a "change" is reported.
 
 Argument order: Cell values are always passed I<in the order they appear
 in the first file>.  When called with a row from the first file then this is
@@ -219,6 +231,6 @@ Jim Avera (jim.avera [at] gmail)
 
 =head1 LICENSE
 
-GPL2
+CC0 1.0 / Public Domain
 
 =cut
