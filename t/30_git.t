@@ -48,15 +48,15 @@ runtest("$tlib/Addrlist.xlsx",
 # By default it uses --color-words output, so be careful to ignore color escapes
 runtest("$tlib/Addrlist.xlsx",
         "$tlib/Addrlist_mod1.xlsx",
-        qr{diff.*a/Addrlist.xlsx.*b/Addrlist_mod1.xlsx
-           .*
-           \@\@\ -1,4\ \+1,5\ \@\@.*\n
+         qr{\A.*diff.*a/Addrlist.xlsx.*b/Addrlist_mod1.xlsx
+           (.*\n)+
+           .*\@\@\ -1,4\ \+1,5\ \@\@.*\n
            "FIRST\ NAME",.*\n
-           John,Brown.*\n
-           .*Lucretia.*,,PA.*,Philadelphia,PA,19133.*\n
-           Harriet.*\n
-           .*Frederick,Douglass
-         }xs,
+           "John","Brown".*\n
+           "Lucretia.*,,"PA".*,"Philadelphia","PA",19133.*\n
+           "Harriet","Tubman",.*\n
+           .*"Frederick",.*\n
+         \z}x,
         "", 1,
           "Changed row and Added rows",
         "-m", "git"
@@ -65,17 +65,17 @@ runtest("$tlib/Addrlist.xlsx",
 runtest("$tlib/Multisheet.xlsx",
         "$tlib/Multisheet2.xlsx",
         qr{\A\*\*\*\ sheet\ 'OtherSheetA'\ exists\ ONLY.*Multisheet.xlsx\n
-           .*
+           \n
            \*\*\*\ sheet\ 'OtherSheetB'\ exists\ ONLY.*Multisheet2.xlsx\n
-           .*
-           diff.*a/Multisheet.xlsx\[AddrListSheet\].*b/Multisheet2.xlsx\[AddrListSheet\]
-           .*
-           \@\@\ -1,4\ \+1,4\ \@\@.*\n
+           \n
+           .*diff.*a/Multisheet.xlsx\[AddrListSheet\].*b/Multisheet2.xlsx\[AddrListSheet\].*\n
+           (.*\n)*
+           .*\@\@\ -1,4\ \+1,4\ \@\@.*\n
            "FIRST\ NAME",.*\n
-           John,Brown.*\n
-           .*Lucretia.*,,PA.*,bogon,PA,19133.*\n
-           Harriet.*\n
-         }xs,
+           "John","Brown".*\n
+           "Lucretia.*,,"PA".*,"bogon","PA",19133.*\n
+           "Harriet.*\n
+         \z}x,
          "", 2, # exit 2 due to unmatched sheet names
         "some sheets with unique names",
         "-m", "git"

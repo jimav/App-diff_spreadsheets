@@ -28,6 +28,7 @@ use Getopt::Long qw/GetOptions/;
 use Guard qw(guard scope_guard);
 use List::Util qw/min max any first/;
 use List::MoreUtils qw/indexes/;
+use Scalar::Util qw/openhandle/;
 use Pod::Find qw/pod_where/;
 use Pod::Usage qw/pod2usage/;
 use Spreadsheet::Edit qw(title2ident);
@@ -240,7 +241,8 @@ if ($opts{keep_temps}) {
 # If a specific sheet was specified, then only that sheet will be extracted.
 foreach my $N (1,2) {
   my $origpath = $opts{"origpath$N"};
-  if (defined(sheetname_from_spec($origpath))) {
+  my $sheet_from_path = sheetname_from_spec($origpath);
+  if (defined $sheet_from_path) {
     die "--sheets argument not allowed because filename specifies a sheet:\n",
         "  ", qsh($origpath), "\n"
       if $opts{sheet_names};
@@ -249,19 +251,22 @@ foreach my $N (1,2) {
   my $dir = File::Spec->catdir($opts{tempdir},"«INFILE$N»");
   remove_tree $dir; make_path $dir || die;
   my $h = convert_spreadsheet($origpath, cvt_to=>"csv",
-                                         outpath => $dir, allsheets => 1);
+                                         allsheets => !$sheet_from_path, 
+                                         outpath => $dir,
+                                         debug => $opts{debug});
   $opts{cvt_from} = $h->{cvt_from};
-  if ($h->{cvt_from} =~ /csv/i) {
+  if ($h->{cvt_from} =~ /csv/i && !openhandle($origpath)) {
     # Input was already a CSV (possibly detected by peeking at actual content).
     # The "converted" file has a bogus name; use the original path instead.
     $opts{"csvpaths$N"} = [ $origpath ];
   } else {
-    opendir(my $dh,$dir) or die;
+    opendir(my $dh, $dir) or die "$dir : $!\n", dvis('$h');
     my @csvpaths = sort map{ File::Spec->catdir($dir,$_) }
                         File::Spec->no_upwards(readdir $dh) ;
     if (0 and @csvpaths == 1) { ### FIXME WHY IS THIS DISABLED ???
+                                ###Answer: Because we want to see the sheetname even if user did not specify it
       # Only one sheet in this file: Rename the csv to just show the
-      # spreadsheet file name without a redundant [sheetname] suffix
+      # spreadsheet file name without a redundant [sheetname] suffix.
       my $new_tmpfname = File::Spec->catdir($dir, basename($origpath)).".csv";
       rename $csvpaths[0], $new_tmpfname or die;
       $opts{"csvpaths$N"} = [ $new_tmpfname ];
@@ -271,7 +276,7 @@ foreach my $N (1,2) {
   }
   my %sheet2csvpath;  # sheetname => csvpath
   foreach (@{ $opts{"csvpaths$N"} }) {
-    my $sheetname = (fileparse($_, qr/\.csv/i))[0];
+    my ($sheetname,undef,undef) = fileparse($_, qr/\.csv/i);
     die if exists $sheet2csvpath{$sheetname};
     $sheet2csvpath{$sheetname} = $_;
   };

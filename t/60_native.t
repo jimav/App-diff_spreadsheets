@@ -37,12 +37,22 @@ runtest("$tlib/Addrlist.xlsx",
 
 runtest("$tlib/Addrlist.xlsx",
         "$tlib/Addrlist_mod1.xlsx",
-        qr/.* Changed\ +row\ +3:.*CITY.*Philadelphia
-           .* ADDED\ +row\ +5:
-           .* FIRST\ NAME.*:.*Frederick
-           .* LAST\ NAME.*:.*Douglass
-          /sx, "", 1, 
-          "Changed row and Added rows");
+        <<'EOF',
+--Changed row 3:
+        CITY: '' →  'Philadelphia'
+--ADDED   row 5:
+  FIRST NAME: 'Frederick'
+   LAST NAME: 'Douglass'
+    Address1: 'Mount Hope Cemetary'
+    Address2: '1133 Mt Hope Ave'
+        CITY: 'Rochester'
+       STATE: 'NY'
+         ZIP: '14620'
+EOF
+        "", 1,
+          "Changed row and Added rows",
+        "-m", "native"
+       );
 
 runtest("$tlib/Multisheet.xlsx",
         "$tlib/Multisheet2.xlsx",

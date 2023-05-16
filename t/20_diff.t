@@ -17,7 +17,7 @@ runtest("$tlib/presidents.xlsx",
         "-m", "diff"
        );
 
-runtest("$tlib/Addrlist.xlsx",
+runtest("$tlib/Addrlist.xlsx", # only has one sheet
         "$tlib/Multisheet.xlsx[AddrListSheet]",
         "", "", 0,
         "1-sheet & multi-sheet[sheetname] (no diffs)",
@@ -51,14 +51,14 @@ runtest("$tlib/Addrlist.xlsx",
            \+\+\+\ Addrlist_mod1.xlsx.*\n
            \@\@\ -1,4\ \+1,5\ \@\@\n
            \ "FIRST\ NAME",.*\n
-           \ John,Brown.*\n
-           -Lucretia.*,,PA,19133\n
-           \+Lucretia.*,Philadelphia,PA,19133\n
-           \ Harriet.*\n
-           \+Frederick,Douglass
+           \ "John","Brown.*\n
+           \-"Lucretia.*,,"PA",19133\n
+           \+"Lucretia.*,"Philadelphia","PA",19133\n
+           \ "Harriet.*\n
+           \+"Frederick","Douglass.*\n
          /xs,
         "", 1,
-          "Changed row and Added rows",
+          "Changed row and Added rows (diff)",
         "-m", "diff"
        );
 
@@ -72,9 +72,10 @@ runtest("$tlib/Multisheet.xlsx",
            \+\+\+\ Multisheet2.xlsx\[AddrListSheet\].*\n
            \@\@\ -1,4\ \+1,4\ \@\@\n
            \ "FIRST\ NAME",.*\n
-           \ John,Brown.*\n
-           -Lucretia.*,,PA,19133\n
-           \+Lucretia.*,bogon,PA,19133\n
+           \ "John","Brown".*\n
+           -"Lucretia.*,,"PA",19133\n
+           \+"Lucretia".*,"bogon","PA",19133\n
+           \ "Harriet.*\n
          /xs,
          "", 2, # exit 2 due to unmatched sheet names
         "some sheets with unique names",
