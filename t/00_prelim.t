@@ -2,7 +2,7 @@
 use FindBin qw($Bin);
 use lib $Bin;
 use t_Common qw/oops/; # strict, warnings, Carp
-use t_TestCommon qw/bug run_perlscript/; # Test::More etc.
+use t_TestCommon qw/bug run_perlscript/; # Test2::V0 etc.
 # N.B. Can not use :silent because it breaks Capture::Tiny
 
 use Capture::Tiny qw/capture/;

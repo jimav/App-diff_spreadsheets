@@ -7,7 +7,7 @@ use parent 'Exporter';
 our @EXPORT = qw(runtest $progname $progpath);
 
 use t_Common; # strict, warnings and lots of stuff
-use t_TestCommon qw/:DEFAULT $debug $verbose $silent/; # imports Test::More
+use t_TestCommon qw/:DEFAULT $debug $verbose $silent/; # imports Test2::V0
 
 use Capture::Tiny ':all';
 use FindBin qw/$Bin/;
@@ -40,7 +40,7 @@ sub runtest($$$$$$;@) {
     diag sprintf("%s at line %d", join(";\n  ",@m), $lno);
   }
   @_ = (@m==0, $desc);
-  goto &Test::More::ok
+  goto &Test2::V0::ok;
 }
 
 1;
