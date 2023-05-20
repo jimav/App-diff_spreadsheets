@@ -11,36 +11,45 @@ use t_TestCommon qw/:DEFAULT $debug $verbose $silent/; # imports Test2::V0
 
 use Capture::Tiny ':all';
 use FindBin qw/$Bin/;
+require PerlIO;
 
 our $progname = "diff_spreadsheets";
 our $progpath = "$Bin/../bin/$progname";
 
 sub runtest($$$$$$;@) {
   my ($in1, $in2, $exp_out, $exp_err, $exp_exit, $desc, @extraargs) = @_;
+  if (state $first_time = 1) {
+    # Capture::Tiny will decode octets from the results according to whatever
+    # encoding was set for STDOUT or STDERR, and if not it won't decode.
+    # This corrupts wide characters unless enc is pre-set on those handles.
+    unless (grep /utf.*8/i, PerlIO::get_layers(*STDOUT)) {
+      croak "STDOUT does not have utf8 or encoding(UTF-8) enabled";
+    }
+    unless (grep /utf.*8/i, PerlIO::get_layers(*STDERR)) {
+      croak "STDERR does not have utf8 or encoding(UTF-8) enabled";
+    }
+    $first_time = 0;
+  }
+  
   #unshift @extraargs, "--silent" if $silent;
   unshift @extraargs, "--verbose" if $verbose;
   unshift @extraargs, "--debug" if $debug;
-  my ($out, $err, $wstat) = capture{ run_perlscript $progpath, @extraargs, $in1, $in2 };
-  my @m;
-  if (ref $exp_out) {
-    push @m, "stdout wrong (!~ $exp_out); GOT:\n$out" if $out !~ /$exp_out/;
-  } else {
-    push @m, "stdout wrong (ne '$exp_out'); GOT:\n$out" if $out ne $exp_out;
-  }
-  if (ref $exp_err) {
-    push @m, "stderr wrong (!~ $exp_err); GOT:\n$err" if $err !~ /$exp_err/;
-  } else {
-    push @m, "stderr wrong (ne '$exp_err'); GOT:\n$err" if $err ne $exp_err;
-  }
-  if ($wstat != ($exp_exit << 8)) {
-    push @m, "exit status wrong (not $exp_exit); GOT ".sprintf("0x%x",$wstat)
-  }
-  if (@m) {
-    my ($lno) = (caller(0))[2];
-    diag sprintf("%s at line %d", join(";\n  ",@m), $lno);
-  }
-  @_ = (@m==0, $desc);
-  goto &Test2::V0::ok;
+  my ($out, $err, $wstat) = capture{ 
+    run_perlscript $progpath, @extraargs, $in1, $in2;
+  };
+
+  # We can only use the 'goto &somewhere' trick for one check; so other
+  # check(s) must be done here and will unhelpfully report the file/linenum 
+  # in here; so include the caller's file/lno in the description.
+  my ($file, $lno) = (caller(0))[1,2];
+  $file = basename($file);
+  
+  is($wstat, ($exp_exit << 8), sprintf("(WSTAT=0x%x)",$wstat)." ${file}:$lno $desc");
+
+  like($err, $exp_err, "(STDERR) ${file}:$lno $desc");
+  
+  @_ = ($out, $exp_out, "(STDOUT) $desc");
+  goto &Test2::V0::like; 
 }
 
 1;

@@ -57,7 +57,7 @@ sub import {
   use 5.011;  # cpantester gets warning that 5.11 is the minimum acceptable
   use 5.018;  # lexical_subs
   require feature;
-  feature->import::into($target, qw/state say current_sub lexical_subs/);
+  feature->import::into($target, qw/state say current_sub lexical_subs fc/);
   warnings->unimport::out_of($target, "experimental::lexical_subs");
 
   # die if obsolete or dangerous syntax is used
@@ -116,7 +116,7 @@ sub import {
                                          weaken isweak refaddr/);
 
   require Cwd;
-  Cwd->import::into($target, qw/getcwd abs_path/);
+  Cwd->import::into($target, qw/getcwd abs_path fastgetcwd fast_abs_path/);
 
   require Guard;
   Guard->import::into($target, qw(scope_guard guard));

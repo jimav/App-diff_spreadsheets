@@ -21,10 +21,12 @@ ok(-x $progpath, "Found the script");
 # Every single cpantesters test fails with errors like
 #   Can't load '/opt/perl-5.37.10/lib/5.37.10/x86_64-linux/auto/Fcntl/Fcntl.so'
 # What is going on???
-{ my $wstat = run_perlscript $progpath;
-  ok($wstat==(2<<8), "$progname sans args WITHOUT CAPTURE");
+
+{ my $wstat = run_perlscript $progpath, devnull(), devnull();
+  ok($wstat==0, "status==0 for $progname devnull devnull");
 }
 
+# Test arg help
 { my ($out, $err, $wstat) = capture{ run_perlscript $progpath };
 
   ok($out eq "", "$progname sans args -> silent on stdout but...")
@@ -41,6 +43,16 @@ ok(-x $progpath, "Found the script");
 
   ok($err eq "", "$progname -h => nothing on stderr")
     || diag dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat);
+}
+
+# Detecting functional errors
+{ my $nepath = " non existent file .csv";
+  my ($out, $err, $wstat) = capture {
+    die "oops" if -e $nepath;
+    run_perlscript $progpath, devnull(), $nepath;
+  };
+  ok($out eq "", "$progname diags should only be on stderr");
+  like($err,qr/\Q$nepath\E.*(missing|no such)/i, "$progname catches non-existent file");
 }
 
 done_testing;

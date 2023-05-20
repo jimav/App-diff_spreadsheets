@@ -8,6 +8,8 @@ use t_dsUtils qw/runtest $progname $progpath/;
 
 my $tlib = "$Bin/../tlib";
 
+use open ':std', IO => ':encoding(UTF-8)';
+
 # runtest($in1, $in2, $exp_out, $exp_err, $exp_exit, $desc)
 
 runtest("$tlib/presidents.xlsx",
