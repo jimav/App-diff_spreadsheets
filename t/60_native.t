@@ -10,6 +10,10 @@ my $tlib = "$Bin/../tlib";
 
 use open ':std', IO => ':encoding(UTF-8)';
 
+BEGIN {
+  $ENV{COLUMNS} = 60;  # for fixed-width test ouput
+}
+
 # runtest($in1, $in2, $exp_out, $exp_err, $exp_exit, $desc)
 
 runtest("$tlib/presidents.xlsx",
@@ -40,9 +44,11 @@ runtest("$tlib/Addrlist.xlsx",
 runtest("$tlib/Addrlist.xlsx",
         "$tlib/Addrlist_mod1.xlsx",
         <<'EOF',
---Changed row 3:
+
+-------- Changed row 3 -------------------------------------
         CITY: '' →  'Philadelphia'
---ADDED   row 5:
+
+-------- ADDED row 5 ---------------------------------------
   FIRST NAME: 'Frederick'
    LAST NAME: 'Douglass'
     Address1: 'Mount Hope Cemetary'
@@ -61,8 +67,8 @@ runtest("$tlib/Multisheet.xlsx",
         qr/.* \*\*\*\ *Sheet.*OtherSheetA.*exists\ ONLY\ in.*Multisheet.xlsx
            .* \*\*\*\ *Sheet.*OtherSheetB.*exists\ ONLY\ in.*Multisheet2.xlsx
            .* \*\*\*\ *AddrListSheet\ *\*\*\*
-           .* Changed\ +row\ +3:
-           .* CITY.*:.*bogon
+           .* ----*\ Changed\ +row\ +3\ .*
+           .* CITY.*:.*'bogon'
           /isx, "", 2,
         "some sheets with unique names",
         "-m", "native"  # explictly specify method

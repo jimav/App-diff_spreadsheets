@@ -43,10 +43,11 @@ sub runtest($$$$$$;@) {
   # in here; so include the caller's file/lno in the description.
   my ($file, $lno) = (caller(0))[1,2];
   $file = basename($file);
+  my $diag = "OUT:<<$out>>\nERR:<<$err>>\n";
   
-  is($wstat, ($exp_exit << 8), sprintf("(WSTAT=0x%x)",$wstat)." ${file}:$lno $desc");
+  is($wstat, ($exp_exit << 8), sprintf("(WSTAT=0x%x)",$wstat)." ${file}:$lno $desc", $diag);
 
-  like($err, $exp_err, "(STDERR) ${file}:$lno $desc");
+  like($err, $exp_err, "(STDERR) ${file}:$lno $desc", $diag);
   
   @_ = ($out, $exp_out, "(STDOUT) $desc");
   goto &Test2::V0::like; 

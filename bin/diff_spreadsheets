@@ -110,11 +110,16 @@ my $rightarrow = "\N{RIGHTWARDS ARROW}\N{HAIR SPACE}";
 
 # 0 or undef to not wrap long lines
 my $maxwidth = do{
-  my $wmsg = ""; # Suppress hard-coded "didn't work" warning from Term::ReadKey 
-  local $SIG{'__WARN__'} = sub { $wmsg .= $_[0] };
-  my ($width, $height) = Term::ReadKey::GetTerminalSize(*STDOUT);
-  warn $wmsg if $wmsg && $wmsg !~ /did.*n.*work/i;
-  $width // 80
+  u($ENV{COLUMNS}) =~ /^[1-9]\d*$/ 
+  ? # Overrides actual terminal width; needed for testing
+    $ENV{COLUMNS}
+  : do{
+      my $wmsg = ""; # Suppress hard-coded "didn't work" from Term::ReadKey 
+      local $SIG{'__WARN__'} = sub { $wmsg .= $_[0] };
+      my ($width, $height) = Term::ReadKey::GetTerminalSize(*STDOUT);
+      warn $wmsg if $wmsg && $wmsg !~ /did.*n.*work/i;
+      $width // 80
+    }
 };
 
 my %opts = (
@@ -510,7 +515,7 @@ sub compile_if_regex(@) { # compile "/.../msix" strings to qr/.../msix
     }
   }
   wantarray ? @specs :
-  @specs==1 ? confess("multiple results") :
+  @specs > 1 ? confess("multiple results") :
   $specs[0]
 }
 
@@ -760,10 +765,10 @@ sub _native_output {
         my $hash2 = $hash_func_code->([@{$row2}[ @$cxlist2 ]], $rx2)
              // die "ERROR: hash-func returned undef for row ".($rx2+1)." in ".$self->{"sheet$N2"}->data_source()."\n";
         if ($hash1 ne $hash2) {
-          $self->diff_rows($rx1, $rx2, "--CHANGED", $dumbrun);
+          $self->diff_rows($rx1, $rx2, "CHANGED", $dumbrun);
           $changed = 1;
         } else {
-          #print "NOT-CHANGED: ", fmt_rownum($rx1,$rx2), "\n"
+          #print "NOT-CHANGED: ", verbrow_str($rx1,$rx2), "\n"
           #  if $debug && !$dumbrun;
         }
       }
@@ -776,14 +781,14 @@ sub _native_output {
       # A hunk of rows deleted from self->{sheet2}
       for my $i (0 .. $#items1) {
         my ($N, $row, $orig_rx) = @{ $items1[$i] };
-        $self->show_row($N, $row, $orig_rx, "--DELETED", $dumbrun);
+        $self->show_row($N, $row, $orig_rx, "DELETED", $dumbrun);
       }
     }
     elsif (@items1 == 0) {
       # A hunk of rows added to self->{sheet2}
       for my $i (0 .. $#items2) {
         my ($N, $row, $orig_rx) = @{ $items2[$i] };
-        $self->show_row($N, $row, $orig_rx, "--ADDED  ", $dumbrun);
+        $self->show_row($N, $row, $orig_rx, "ADDED", $dumbrun);
       }
     }
     else {
@@ -795,23 +800,23 @@ sub _native_output {
           # records; show as deletes and adds.
           my ($N1, $row1, $rx1) = @{$items1[$i]};
           my ($N2, $row2, $rx2) = @{$items2[$i]};
-          $self->show_row($N1, $row1, $rx1, "--Deleted", $dumbrun);
-          $self->show_row($N2, $row2, $rx2, "--Added  ", $dumbrun);
+          $self->show_row($N1, $row1, $rx1, "Deleted", $dumbrun);
+          $self->show_row($N2, $row2, $rx2, "Added", $dumbrun);
         } else {
           my (undef, undef, $rx1) = @{$items1[$i]};
           my (undef, undef, $rx2) = @{$items2[$i]};
-          $self->diff_rows($rx1, $rx2, "--Changed", $dumbrun)
+          $self->diff_rows($rx1, $rx2, "Changed", $dumbrun)
         }
       }
       for my $i ($lim+1 .. $#items1) {
         my ($N1, $row1, $rx1) = @{$items1[$i]};
         oops unless $N1==1;
-        $self->show_row(1, $row1, $rx1, "--Deleted*", $dumbrun);
+        $self->show_row(1, $row1, $rx1, "Deleted*", $dumbrun);
       }
       for my $i ($lim+1 .. $#items2) {
         my ($N2, $row2, $rx2) = @{$items2[$i]};
         oops unless $N2==2;
-        $self->show_row(2, $row2, $rx2, "--Added* ", $dumbrun);
+        $self->show_row(2, $row2, $rx2, "Added*", $dumbrun);
       }
     }
   }
@@ -1092,10 +1097,12 @@ sub fmt_value($$) {
   $str =~ s/\\n/\\n\n${indent}/gs;
   if ($maxwidth) { # fold
     my $first_mw = $maxwidth - $indent_width;
-    oops "maxwidth $maxwidth is too narrow\nfmw=$first_mw iw=$indent_width <<$str>>" 
-      if $first_mw < 20;  # sanity
-    $str =~ s/\A([^\n]{$first_mw})([^\n]+)/$1\n${indent}$2/m;
-    while ($str =~ s/^([^\n]{$maxwidth})([^\n]+)/$1\n${indent}$2/m) { }
+    if (length($str) > $first_mw) {
+      oops "maxwidth $maxwidth is too narrow\nfmw=$first_mw iw=$indent_width <<$str>>" 
+        if $first_mw < 20;  # sanity
+      $str =~ s/\A([^\n]{$first_mw})([^\n]+)/$1\n${indent}$2/m;
+      while ($str =~ s/^([^\n]{$maxwidth})([^\n]+)/$1\n${indent}$2/m) { }
+    }
   }
   $str
 }
@@ -1120,21 +1127,22 @@ sub show_cell {
 
   my $widest_title_width = $self->{widest_title_width};
   if ($dumbrun) {
-
-    # This was wrong bc \n was visualized to \\n and real line-breaks
-    # are not inserted when showing titles (should they be?)
-    #my $mw = max( map{length} ($title =~ /^(.*)/mg) );
-    
-    my $mw = length($title);
-
-    if ($mw > $widest_title_width) {
-      $self->{widest_title_width} = $mw;
+    # $title has been visualized with newline replaced by literal '\n',
+    # and they will be displayed just that way, without any wrapping.
+    my $tw = length($title);
+    if ($tw > $widest_title_width) {
+      $self->{widest_title_width} = $tw;
     }
     return
   }
-
+  
   my $twidth = (2+$widest_title_width);  # 2 for indent
+
   my $v1str = fmt_value($v1, $twidth+3); # +3 for the ": '"
+
+  my $v2str = fmt_value($v2, $twidth+3)
+                if defined($v2) && $v1 ne $v2;
+
   if (! defined $v2) {
     printf "%*s: '%s'\n", $twidth, $title, $v1str;
   }
@@ -1142,7 +1150,6 @@ sub show_cell {
     printf "%*s: '%s' (unchanged)\n", $twidth, $title, $v1str;
   }
   else {
-    my $v2str = fmt_value($v2, $twidth+3);
     my $v1_nl = 1 + @{[ $v1str =~ /\n/sg ]};
     my $v2_nl = 1 + @{[ $v2str =~ /\n/sg ]};
     if ($v2_nl <= 1) {
@@ -1191,18 +1198,20 @@ sub show_cell {
     }
   }
 } #show_cell
-sub fmt_rownum($;$) {
-  my ($rx1, $rx2) = @_;
-  my $s = "row ".($rx1+1);
+sub row_header($$;$) {
+  my ($verb, $rx1, $rx2) = @_;
+  my $s = "$verb row ".($rx1+1);
   $s .= " (row ".($rx2+1)." in 2nd file)" if defined($rx2) && $rx1 != $rx2;
-  $s;
+  sprintf "\n-------- %s %s\n", $s, ('-' x ($maxwidth-10-length($s)));
 }
 sub show_row {
-  #my ($self, $N, $rx, $comment, $dumbrun) = @_; oops if @_ != 5;
-  my ($self, $N, $row, $curr_rx, $comment, $dumbrun) = @_; oops if @_ != 6;
+  #my ($self, $N, $rx, $verb, $dumbrun) = @_; oops if @_ != 5;
+  my ($self, $N, $row, $curr_rx, $verb, $dumbrun) = @_; oops if @_ != 6;
   my $sh = $self->{"sheet$N"};
   my $orig_rx = $sh->attributes->{ORIGINAL_RXS}->[$curr_rx] // $curr_rx;
-  print "$comment ", fmt_rownum($orig_rx), ":\n" unless $dumbrun;
+  unless ($dumbrun) { 
+    print row_header($verb, $orig_rx);
+  }
   my sub ABC_label {
     my $cx = shift;
     defined($sh->title_rx()) ? "(".cx2origlet($sh,$cx).")" : cx2let($cx);
@@ -1243,12 +1252,12 @@ sub show_row {
   print "    (empty row)\n" if $all_empty && !$dumbrun;
 }
 sub diff_rows {
-  my ($self, $rx1, $rx2, $comment, $dumbrun) = @_;
+  my ($self, $rx1, $rx2, $verb, $dumbrun) = @_;
   oops unless @_ == 5;
   my ($sheet1, $sheet2) = @$self{qw/sheet1 sheet2/};
   my $orig_rx1 = $sheet1->attributes->{ORIGINAL_RXS}->[$rx1] // $rx1;
   my $orig_rx2 = $sheet2->attributes->{ORIGINAL_RXS}->[$rx2] // $rx2;
-  my $headerline = "$comment ".fmt_rownum($orig_rx1,$orig_rx2).":\n";
+  my $headerline = row_header($verb, $orig_rx1, $orig_rx2);
   my $header_printed = $dumbrun; #suppress during dumb run
   my $row1 = $sheet1->[$rx1] // die "BUG: Undef row in sheet1 at rx1=$rx1\n";
   my $row2 = $sheet2->[$rx2] // die "BUG: Undef row in sheet2 at rx2=$rx2\n";
@@ -1295,7 +1304,7 @@ sub diff_rows {
     }
     delete $notseen2{$cx2};
   }
-  die dvis 'bug $rx1 $rx2 $comment %notseen1 %notseen2\n$sheet1->attributes()\n$sheet2->attributes()'
+  die dvis 'bug $rx1 $rx2 $verb %notseen1 %notseen2\n$sheet1->attributes()\n$sheet2->attributes()'
     if keys(%notseen1) or keys(%notseen2);
 }
 
