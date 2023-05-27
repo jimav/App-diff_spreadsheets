@@ -1057,7 +1057,7 @@ sub compare_native {
   my $changed = $self->_native_output(\@cxlist1, \@cxlist2, $diff, 1);
 
   if ($changed) {
-    print $self->{sheetname_header};  # possibly ""
+    print "\n",$self->{sheetname_header};  # possibly ""
     $diff->Reset;
     my $changed2 = $self->_native_output(\@cxlist1, \@cxlist2, $diff, 0);
     oops if $changed2 != $changed;
