@@ -9,7 +9,7 @@ our @EXPORT = qw(runtest $progname $progpath);
 use t_Common; # strict, warnings and lots of stuff
 use t_TestCommon qw/:DEFAULT $debug $verbose $silent/; # imports Test2::V0
 
-use Capture::Tiny ':all';
+use Capture::Tiny ();
 use FindBin qw/$Bin/;
 require PerlIO;
 
@@ -31,25 +31,40 @@ sub runtest($$$$$$;@) {
     $first_time = 0;
   }
   
+  my $show_output = $debug || ($exp_err eq "" && $exp_out eq "");
+
   #unshift @extraargs, "--silent" if $silent;
   unshift @extraargs, "--verbose" if $verbose;
   unshift @extraargs, "--debug" if $debug;
-  my ($out, $err, $wstat) = capture{ 
-    run_perlscript $progpath, @extraargs, $in1, $in2;
-  };
+  my ($out, $err, $wstat);
+  if ($show_output) {
+    ($out, $err, $wstat) = Capture::Tiny::tee { 
+      run_perlscript $progpath, @extraargs, $in1, $in2;
+    };
+  } else {
+    ($out, $err, $wstat) = Capture::Tiny::capture { 
+      run_perlscript $progpath, @extraargs, $in1, $in2;
+    };
+  }
 
   # We can only use the 'goto &somewhere' trick for one check; so other
   # check(s) must be done here and will unhelpfully report the file/linenum 
   # in here; so include the caller's file/lno in the description.
   my ($file, $lno) = (caller(0))[1,2];
   $file = basename($file);
-  my $diag = "OUT:<<$out>>\nERR:<<$err>>\n";
+  my $diag = $show_output ? "" : "OUT:<<$out>>\nERR:<<$err>>\n";
   
   is($wstat, ($exp_exit << 8), sprintf("(WSTAT=0x%x)",$wstat)." ${file}:$lno $desc", $diag);
 
-  like($err, $exp_err, "(STDERR) ${file}:$lno $desc", $diag);
-  
-  @_ = ($out, $exp_out, "(STDOUT) $desc");
+  # Don't check STDERR if 'debug' is enabled, as it may be full of tracing
+  if (!$debug) {
+    # Similarly if 'verbose' is enabled *unless* the caller expects something
+    if (!$verbose || $exp_err ne "") {
+      like($err, $exp_err, "(STDERR) ${file}:$lno $desc", $diag);
+    }
+  }
+
+  @_ = ($out, $exp_out, "(STDOUT) $desc", $diag);
   goto &Test2::V0::like; 
 }
 

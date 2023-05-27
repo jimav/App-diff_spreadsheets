@@ -258,7 +258,7 @@ foreach my $N (1,2) {
   my $h = convert_spreadsheet($origpath, cvt_to=>"csv",
                                          allsheets => !$sheet_from_path, 
                                          outpath => $dir,
-                                         #debug => $opts{debug},
+                                         debug => $opts{debug},
                              );
   $opts{cvt_from} = $h->{cvt_from};
   if ($h->{cvt_from} =~ /csv/i && !openhandle($origpath)) {
