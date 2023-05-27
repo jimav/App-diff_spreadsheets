@@ -41,8 +41,7 @@ sheet name specified (using the syntax shown).
 
 Otherwise, I<every> sheet contained in each workbook is comapred with the
 same-named sheet in the other file, warning about any un-paired sheets.
-This feature is available
-only if the Gnumeric I<ssconvert> utility is installed.
+This feature is available only if LibreOffice 7.2 or later is installed.
 
 Tabs, newlines, etc. and non-printable characters are replaced with
 escapes like "\t" or "\n" for human consumption.
