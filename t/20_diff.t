@@ -6,6 +6,11 @@ use t_TestCommon qw/bug run_perlscript/; # Test2::V0 etc.
 # N.B. Can not use :silent because it breaks Capture::Tiny
 use t_dsUtils qw/runtest $progname $progpath/;
 
+use File::Which qw/which/;
+unless (which("loffice")) {
+  plan(skip_all => "Libre Office is not installed");
+}
+
 my $tlib = "$Bin/../tlib";
 
 use open ':std', IO => ':encoding(UTF-8)';
