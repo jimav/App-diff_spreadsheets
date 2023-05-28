@@ -33,12 +33,11 @@ runtest("$tlib/Addrlist.csv",
 
 runtest("$tlib/Addrlist.csv",
         "$tlib/Addrlist_mod1.csv",
-        <<'EOF',
-
--------- Changed row 3 -------------------------------------
+        qr{^[\s\n]*\
+---* Changed row 3 ---*
         CITY: '' →  'Philadelphia'
 
--------- ADDED row 5 ---------------------------------------
+---* ADDED row 5 ---*
   FIRST NAME: 'Frederick'
    LAST NAME: 'Douglass'
     Address1: 'Mount Hope Cemetary'
@@ -46,7 +45,7 @@ runtest("$tlib/Addrlist.csv",
         CITY: 'Rochester'
        STATE: 'NY'
          ZIP: '14620'
-EOF
+[\s\n]*$},
         "", 1,
           "Changed row and Added rows",
         "-m", "native"

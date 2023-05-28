@@ -48,12 +48,11 @@ runtest("$tlib/Addrlist.xlsx",
 
 runtest("$tlib/Addrlist.xlsx",
         "$tlib/Addrlist_mod1.xlsx",
-        <<'EOF',
-
--------- Changed row 3 -------------------------------------
+        qr{^[\s\n]*\
+---+ Changed row 3 ---+
         CITY: '' →  'Philadelphia'
 
--------- ADDED row 5 ---------------------------------------
+---+ ADDED row 5 ---+
   FIRST NAME: 'Frederick'
    LAST NAME: 'Douglass'
     Address1: 'Mount Hope Cemetary'
@@ -61,7 +60,7 @@ runtest("$tlib/Addrlist.xlsx",
         CITY: 'Rochester'
        STATE: 'NY'
          ZIP: '14620'
-EOF
+[\s\n]*$},
         "", 1,
           "Changed row and Added rows",
         "-m", "native"
