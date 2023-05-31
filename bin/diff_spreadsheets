@@ -177,6 +177,7 @@ GetOptions(
    "setup-code=s"              => sub{ $opts{setup_code} = $_[1] },
    "sheets=s"                  => sub{ push @{$opts{sheet_names}}, $_[1] },
    "show-empties"              => sub{ $opts{show_empties} = $_[1] },
+   "silent"                    => sub{ $opts{silent} = $_[1] },
    "sort-rows!"                => sub{ $opts{sort_rows} = $_[1] }, # allow --no-sort
    "speed-large-files"         => sub{ push @diff_opts, "-$_[0]"; },
    "strip-trailing-cr"         => sub{ push @diff_opts, "-$_[0]"; },
@@ -606,6 +607,7 @@ sub new {
                            quote_char   => $hash{quote_char},
                            sep_char     => $hash{sep_char},
                            encoding     => $hash{encoding},
+                           silent       => $hash{silent},
                            (defined($title_row_spec)
                              ? $title_row_spec == 0
                                ? (title_rx => undef)
