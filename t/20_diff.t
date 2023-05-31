@@ -7,8 +7,11 @@ use t_TestCommon qw/bug run_perlscript/; # Test2::V0 etc.
 use t_dsUtils qw/runtest $progname $progpath/;
 
 use File::Which qw/which/;
-unless (which("loffice")) {
+if (! which("loffice")) {
   plan(skip_all => "Libre Office is not installed");
+}
+elsif (! which("diff")) {
+  plan(skip_all => "diff is not installed");
 }
 
 my $tlib = "$Bin/../tlib";
