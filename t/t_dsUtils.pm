@@ -33,9 +33,12 @@ sub runtest($$$$$$;@) {
   
   my $show_output = $debug || ($exp_err eq "" && $exp_out eq "");
 
-  #unshift @extraargs, "--silent" if $silent;
   unshift @extraargs, "--verbose" if $verbose;
   unshift @extraargs, "--debug" if $debug;
+  #unshift @extraargs, "--silent" if $silent;
+  # Suppress waiting-for-lockfile messages
+  unshift @extraargs, "--silent" unless $verbose or $debug;
+  
   my ($out, $err, $wstat);
   if ($show_output) {
     ($out, $err, $wstat) = Capture::Tiny::tee { 

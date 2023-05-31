@@ -58,11 +58,11 @@ runtest("$tlib/Addrlist.xlsx",
          qr{\A.*diff.*a/Addrlist.xlsx.*b/Addrlist_mod1.xlsx
            (.*\n)+
            .*\@\@\ -1,4\ \+1,5\ \@\@.*\n
-           "FIRST\ NAME",.*\n
-           "John","Brown".*\n
-           "Lucretia.*,,"PA".*,"Philadelphia","PA",19133.*\n
-           "Harriet","Tubman",.*\n
-           .*"Frederick",.*\n
+           FIRST\ NAME,.*\n
+           John,Brown.*\n
+           Lucretia.*,,PA.*,Philadelphia,PA,19133.*\n
+           Harriet,Tubman,.*\n
+           .*Frederick,.*\n
          \z}x,
         "", 1,
           "Changed row and Added rows",
@@ -78,10 +78,10 @@ runtest("$tlib/Multisheet.xlsx",
            .*diff.*a/Multisheet.xlsx\[AddrListSheet\].*b/Multisheet2.xlsx\[AddrListSheet\].*\n
            (.*\n)*
            .*\@\@\ -1,4\ \+1,4\ \@\@.*\n
-           "FIRST\ NAME",.*\n
-           "John","Brown".*\n
-           "Lucretia.*,,"PA".*,"bogon","PA",19133.*\n
-           "Harriet.*\n
+           FIRST\ NAME,.*\n
+           John,Brown.*\n
+           Lucretia.*,,PA.*,bogon,PA,19133.*\n
+           Harriet.*\n
          \z}x,
          "", 2, # exit 2 due to unmatched sheet names
         "some sheets with unique names",

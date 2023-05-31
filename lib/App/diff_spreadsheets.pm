@@ -11,7 +11,7 @@ package App::diff_spreadsheets;
 
 1;
 
-# ABSTRACT: Diff spreadsheets (or CSVs) showing changed cells
+# ABSTRACT: Diff spreadsheets or CSVs showing changed cells
 
 __END__
 
@@ -31,8 +31,8 @@ diff_spreadsheets [OPTIONS] file1.xls file2.ods  # all coresponding sheets
 
 =head1 DESCRIPTION
 
-The files may be CSVs or any spreadsheet format supported by
-Gnumeric or Open/Libre Office (if you have them installed).
+CSV files may be always used.  Spreadsheets may be used if 
+Libre Office 7.2 or later is installed.
 
 If each input has only one sheet then they are compared regardless
 of sheet names.  Each file could be a .CSV, a spreadsheet workbook
@@ -41,32 +41,28 @@ sheet name specified (using the syntax shown).
 
 Otherwise, I<every> sheet contained in each workbook is comapred with the
 same-named sheet in the other file, warning about any un-paired sheets.
-This feature is available only if LibreOffice 7.2 or later is installed.
 
 Tabs, newlines, etc. and non-printable characters are replaced with
 escapes like "\t" or "\n" for human consumption.
 
 =head1 OPTIONS
 
-=head2 -m --method [native|diff|tkdiff]
+=head2 -m --method [native | diff | tkdiff | git]
 
 I<native> (the default) shows only the changed I<cells> in rows which
 differ.   Corresponding columns are identified by title,
 and need not be in the same order 
 (see also C<--id-columns>).
 
-I<diff>, I<tkdiff>, I<git>, or I<gitchars> run an external tool on
+I<diff>, I<tkdiff>, or I<git> run an external tool on
 temporary text (CSV) files created from the inputs, in which ignored columns
 have been removed and non-graphic characters changed to escapes.
 
 Most diff(1) options are accepted and passed through, but are not
 documented here.
 
-I<git> and I<gitchars> use C<git diff> with options to color-code
-the changed parts within changed lines.  I<git> shows words which were
-added in C<file2> in green and deleted words in red.  I<gitchars> highlights
-individual characters.  These are the defaults; most git(1) diff options
-are accepted and passed through, such as --word-diff-regex.
+I<git> uses C<git diff> to, by default, color-code changed words;
+most git(1) diff options are passed through.
 
 =head2 --title-row [ROWNUMBER]
 
@@ -82,12 +78,10 @@ Ignore differences in certain columns.
 
 In the first form (not negated), the specified columns are used for
 comparisons and others are ignored when deciding if a row changed.
+When negated ("-" prefix) the specified columns are ignored.
 
-If COLSPECs are negated (prefixed by "-"), then those columns are
-ignored when deciding if a row changed.
-
-COLSPEC may be a column title, a /regex/ or m{regex} matching a title,
-a column letter code (A, B, etc.), or an identifer
+I<COLSPEC> may be a column title, a /regex/ or m{regex} matching 
+one or more titles, a column letter code (A, B, etc.), or an identifer
 as described in L<Spreadsheet::Edit>.
 
 =head2 --id-columns COLSPEC[,COLSPEC ...] 
@@ -95,10 +89,9 @@ as described in L<Spreadsheet::Edit>.
 Specify columns which together uniquely B<identify records> (i.e. rows).
 
 Before running any "diff" operation, the data rows in each file are
-sorted using the specified columns as sort keys in the order given 
-(comparison is alphabetic).
-This puts corresponding rows in the same relative vertical position
-in each file, making it more likely that a change to a record 
+sorted on the specified columns (comparison is alphabetic), so
+that corresponding rows are in the same relative vertical position
+in each file.  This makes it more likely that a change 
 is detected as a CHANGE and not as confusing separate DELETE and INSERT.
 
 B<C<--no-sort-rows>> disables this sorting so you can pre-sort the
@@ -106,15 +99,18 @@ data yourself (for example, if "id columns" should be sorted
 numerically).
 
 When using the default "native" diff algorithm, the I<original>
-row numbers in each file are displayed in the results. 
+row numbers in each file are displayed in the results, hiding
+the effects of sorting.
 
-=head2 The following options apply only to the I<native> method:
+The "native" algorithm always displays the values of the "id" columns
+in changed rows.
 
-  
+=head2 The following options apply only to the 'native' method:
+
 
 =head2 --always-show COLSPEC[,COLSPEC ...]
 
-By default, when a changed row is displayed the changed cells are shown
+When a changed row is displayed the changed cells are shown
 plus all cells implied by C<--id-columns> whether changed or not.
 
 The C<--always-show> option supplies an alternative set of columns
@@ -159,39 +155,42 @@ reportable changes.
 
 Specifically: I<hashid-func> is called for each row
 passing only values from C<--id-column> (or if
-not specified then all columns).  If undef is returned
-then that row is ignored.  If the same string is returned for a pair of
-rows from the two files then I<hash-func> is later used to determine if
-there are reportable changes.  If a unique string is returned 
-by I<hashid_func>,
+not specified then all columns).  
+If undef is returned then that row is ignored.  
+
+If the B<same> string is returned for a pair of
+rows from the two files then any reportable differences are shown
+as a "change" to the record. I<hash-func> is later called to determine
+if there are reportable changes.  
+
+If a B<unique> string is returned by I<hashid_func>,
 i.e. there is no corresponding row in the other file, then that row
 will be reported as "deleted" or "inserted" and I<hash-func> is not
 used for that row.
 
-When I<hash-func> is called (i.e. when a pair of corresponding rows has
-been identified), it is passed I<all> cells in a row (or those
+When I<hash-func> is called it is passed I<all> cells in a row (or those
 specified with C<--columns>).  If the result is different for
 corresponding rows then a "change" is reported.
 
-Argument order: Cell values are always passed I<in the order they appear
-in the first file>.  When called with a row from the first file then this is
-simply the order of columns in that file; when called with a row from the
-second file, then columns which also exist in the first file are passed
-in the order they appear in the first file, followed by any columns which exist
-only in second file in their natural order.
+B<Argument order:>
+When called with a row from the first file, cell values are passed in their natural order;
+when called with a row from the second file, 
+columns which also exist in the first file are passed first, 
+I<in the order they appear in the first file>, 
+followed by any columns which exist only in the second file.
 
 If there are no titles then all columns are passed in their natural order.
 
-=head2 --setup-code PERLCODE
+=for notnow =head2 --setup-code PERLCODE
+=for notnow 
+=for notnow Allows arbitrary initialization, possibly editing the data in memory
+=for notnow or declaring global variables (with C<our>) to be later used by
+=for notnow C<--hashid-func> or C<--hash-func> subs.
+=for notnow 
+=for notnow The setup sub is called with parameters
+=for notnow ($sheet1, $sheet2, \@idcxlist1, \@idcxlist2);
 
-Allows arbitrary initialization, possibly editing the data in memory
-or declaring global variables (with C<our>) to be later used by
-C<--hashid-func> or C<--hash-func> subs.
-
-The setup sub is called with parameters
-($sheet1, $sheet2, \@idcxlist1, \@idcxlist2);
-
-All user-defined PERLCODE subs are compiled into the same package.
+The user-defined PERLCODE subs are compiled into the same package.
 
 =head2 --quote-char CHARACTER   (default is ")
 
@@ -214,19 +213,13 @@ applied to both input files.
 
 Probably what you expect.
 
-=head1 BUGS
-
-A bug in Libre Office (and Open Office) prevents reading spreadsheets
-if the user has any document open, even unrelated.  This problem does
-not occur if gnumeric is installed, or when reading CSVs.
-
 =head1 SEE ALSO
 
 L<Spreadsheet::Edit>, L<Sreadsheet::Edit::IO>
 
 =head1 AUTHOR
 
-Jim Avera (jim.avera [at] gmail)
+Jim Avera (jim.avera  gmail)
 
 =head1 LICENSE
 

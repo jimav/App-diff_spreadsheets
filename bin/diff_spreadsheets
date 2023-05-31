@@ -12,7 +12,7 @@ use strict; use warnings FATAL => 'all'; use 5.010;
 # POD HAS BEEN MOVED TO THE STUB LIBRARY App::diff_spreadsheets.pm
 ######################################################################
 
-use strict; use warnings; 
+use strict; use warnings;
 use feature qw(switch state say lexical_subs fc);
 no warnings "experimental::lexical_subs";
 
@@ -32,7 +32,7 @@ use Scalar::Util qw/openhandle/;
 use Pod::Find qw/pod_where/;
 use Pod::Usage qw/pod2usage/;
 use Spreadsheet::Edit qw(title2ident);
-use Spreadsheet::Edit::IO qw/convert_spreadsheet 
+use Spreadsheet::Edit::IO qw/convert_spreadsheet
              sheetname_from_spec filepath_from_spec form_spec_with_sheetname/;
 use Term::ReadKey ();
 sub oops(@) { unshift @_, "oops "; require Carp; goto &Carp::confess; }
@@ -110,11 +110,11 @@ my $rightarrow = "\N{RIGHTWARDS ARROW}\N{HAIR SPACE}";
 
 # 0 or undef to not wrap long lines
 my $maxwidth = do{
-  u($ENV{COLUMNS}) =~ /^[1-9]\d*$/ 
+  u($ENV{COLUMNS}) =~ /^[1-9]\d*$/
   ? # Overrides actual terminal width; needed for testing
     $ENV{COLUMNS}
   : do{
-      my $wmsg = ""; # Suppress hard-coded "didn't work" from Term::ReadKey 
+      my $wmsg = ""; # Suppress hard-coded "didn't work" from Term::ReadKey
       local $SIG{'__WARN__'} = sub { $wmsg .= $_[0] };
       my ($width, $height) = Term::ReadKey::GetTerminalSize(*STDOUT);
       warn $wmsg if $wmsg && $wmsg !~ /did.*n.*work/i;
@@ -256,7 +256,7 @@ foreach my $N (1,2) {
   my $dir = File::Spec->catdir($opts{tempdir},"«INFILE$N»");
   remove_tree $dir; make_path $dir || die;
   my $h = convert_spreadsheet($origpath, cvt_to=>"csv",
-                                         allsheets => !$sheet_from_path, 
+                                         allsheets => !$sheet_from_path,
                                          outpath => $dir,
                                          debug => $opts{debug},
                              );
@@ -269,8 +269,8 @@ foreach my $N (1,2) {
     opendir(my $dh, $dir) or die "$dir : $!\n", dvis('$h');
     my @csvpaths = sort map{ File::Spec->catdir($dir,$_) }
                         File::Spec->no_upwards(readdir $dh) ;
-    if (0 and @csvpaths == 1) { ### FIXME WHY IS THIS DISABLED ???
-                                ###Answer: Because we want to see the sheetname even if user did not specify it
+    if (0 and @csvpaths == 1) { ## FIXME WHY IS THIS DISABLED ???
+                                ##Answer: Because we want to see the sheetname even if user did not specify it
       # Only one sheet in this file: Rename the csv to just show the
       # spreadsheet file name without a redundant [sheetname] suffix.
       my $new_tmpfname = File::Spec->catdir($dir, basename($origpath)).".csv";
@@ -526,7 +526,7 @@ sub __truncate($$) {
     if (length($_) > $maxwid) {
       $changed++;
       # cut before the first actual newline or after visualized newline
-      s/\A.+?(?:\\n|(?=\n))\K.*/.../s;  
+      s/\A.+?(?:\\n|(?=\n))\K.*/.../s;
       if (length($_) > $maxwid) {
         my $numdots = max(3, length($_)-$maxwid);
         substr($_, $maxwid - $numdots) = ("." x $numdots);
@@ -607,7 +607,7 @@ sub new {
                            sep_char     => $hash{sep_char},
                            encoding     => $hash{encoding},
                            (defined($title_row_spec)
-                             ? $title_row_spec == 0 
+                             ? $title_row_spec == 0
                                ? (title_rx => undef)
                                : (title_rx => ($title_row_spec-1),
                                   required => [compile_if_regex
@@ -634,20 +634,22 @@ sub new {
     # Each <spec> might be a regex which matches multiple columns!
     my %cx2seq;
     foreach my $spec (@$always_show_columns, @$id_columns,
-                      @columns ###unnecessary???
+                      @columns #unnecessary???
                      ) {
       my @cxlist = $sh->spectocx(compile_if_regex($spec));
 
       if (defined(my $prev_aliases = $sh->attributes->{TRACKING}->{ $spec })) {
         # This same spec was seen before (perhaps in both always-show & id),
-        # and we should have processed what is in @cxlist before.
-        
+        # and we already processed the cx(s) the spec specifies, i.e. @cxlist.
+
         my %seen_cx = map{($_ => 1)} @cxlist; # Sanity check...
-        delete $seen_cx{ $sh->colx->{$_} } for @$prev_aliases;
+        for (@$prev_aliases) {
+          oops unless defined delete $seen_cx{ $sh->colx->{$_} };
+        }
         oops if keys %seen_cx;
       } else {
-        my @aliaslist = 
-                  map { "__origcx${_}_".$cx2seq{$_}++."_".title2ident($spec) } 
+        my @aliaslist =
+                  map { "__origcx${_}_".$cx2seq{$_}++."_".title2ident($spec) }
                       @cxlist;
         $sh->attributes->{TRACKING}->{ $spec } = \@aliaslist;
         for (0..$#aliaslist) {
@@ -656,7 +658,7 @@ sub new {
         }
       }
     }
-    
+
     # Pre-sort the files
     if (@$id_columns && $hash{sort_rows}) {
 
@@ -670,7 +672,7 @@ sub new {
       # that has to be done after deleting ignored columns (otoh maybe we can
       # sort after deleting?)  For now, repeating code from there...
       my @key_cxs = map{
-                      map{ $sh->colx->{$_} // oops } 
+                      map{ $sh->colx->{$_} // oops }
                       @{ $sh->attributes->{TRACKING}->{ $_ } // oops }
                     }
                     @{$hash{id_columns}} ;
@@ -688,13 +690,13 @@ sub new {
 
     # Remove columns not being compared
     if (@columns) {
+      my @cxlist = $sh->spectocx(compile_if_regex(@columns));
       my %delete_cxs;
       if ($negated) {
-        %delete_cxs = map{ $_ => 1 }
-                         $sh->spectocx(compile_if_regex(@columns));
+        %delete_cxs = map{ $_ => 1 } @cxlist;
       } else {
         %delete_cxs = map{ $_ => 1 } 0..$sh->num_cols-1;
-        delete @delete_cxs{ $sh->spectocx(compile_if_regex(@columns)) };
+        delete @delete_cxs{ @cxlist };
       }
       my @deleted_cxs = sort {$a <=> $b} keys %delete_cxs;
       warn "negated=",vis($negated),
@@ -706,7 +708,7 @@ sub new {
     } else {
       $sh->attributes->{DELETED_CXS} = [];
     }
-    
+
     # Change newline etc. and non-printing to visible escapes
     $sh->apply_all(sub{
       foreach (@{ $sh->crow }) {
@@ -722,7 +724,7 @@ sub new {
       }
     }
   }
-  
+
   # Append empty columns if needed to make both sheets the same width
   for my $N (1,2) {
     my $sh = $hash{"sheet$N"};
@@ -733,7 +735,7 @@ sub new {
 
 sub _getncols($$) {
   my ($sh, $rx) = @_;
-  $rx >= ($sh->title_rx//0) ? $sh->attributes->{NUM_DATA_COLS} : $sh->num_cols
+  $rx >= ($sh->title_rx//0) ? $sh->attributes->{NUMCOLS_USED} : $sh->num_cols
 }
 
 sub _title_or_origABC($$) {
@@ -800,8 +802,9 @@ sub _native_output {
           # records; show as deletes and adds.
           my ($N1, $row1, $rx1) = @{$items1[$i]};
           my ($N2, $row2, $rx2) = @{$items2[$i]};
-          $self->show_row($N1, $row1, $rx1, "Deleted", $dumbrun);
-          $self->show_row($N2, $row2, $rx2, "Added", $dumbrun);
+          #??? When is it not the case that $N1==1 and $N2==2 ???
+          $self->show_row($N1, $row1, $rx1, "*Deleted", $dumbrun);
+          $self->show_row($N2, $row2, $rx2, "*Added", $dumbrun);
         } else {
           my (undef, undef, $rx1) = @{$items1[$i]};
           my (undef, undef, $rx2) = @{$items2[$i]};
@@ -821,7 +824,164 @@ sub _native_output {
     }
   }
   return $changed
-}
+}#_native_output
+
+sub _check_title_rows {
+  my $self = shift;
+  my ($sh1, $sh2) = @$self{qw/sheet1 sheet2/};
+
+  if (!defined($self->{title_row})) {
+    my sub _titlerow_msg {
+      my $sh = shift;
+      my $rx = $sh->title_rx;
+      defined($rx) ? "--title-row ".($rx+1) : "NO --title-row"
+    }
+    if ($self->{verbose}) {
+      if (u($sh1->title_rx) eq u($sh2->title_rx)) {
+        warn "> Auto-detected ", _titlerow_msg($sh1), " in both\n";
+      } else {
+        warn "> Auto-detected DIFFERENT title rows:\n";
+        warn "    ",_titlerow_msg($sh1), " in ", $sh1->data_source, "\n";
+        warn "    ",_titlerow_msg($sh2), " in ", $sh2->data_source, "\n";
+      }
+    }
+  } else {
+    confess "bug"
+      ,vis($sh1->attributes())
+      if $self->{title_row}==0 && defined( $sh1->title_rx );
+  }
+}#_check_title_rows
+
+# Find corresponding columns with the same title or fuzzy-matched titles
+sub _pairup_columns {
+  my $self = shift;
+  my ($sh1, $sh2) = @$self{qw/sheet1 sheet2/};
+  # Match titles; if not all matched, try fuzzy alternatives, exhausting all
+  # possibilities at each "level of fuzzyness" before trying the next level.
+  #
+  # Matching by levels avoids wrongly matching a fuzzed title when the same
+  # string is a non-fuzzed (or less-fuzzed) title in the other file.
+  # For example, with
+  #    f1=(Foo, Bar)  f2=(Foo, foo, bar)
+  # "Foo" must be matched before trying fuzzed versions; otherwise
+  # f1-cx0 might be fuzzed to "foo" and wrongly match f2-cx1 when it
+  # should match f2-cx0.
+  #
+  # Note: Fuzzing can make mistakes.  For example with
+  #   f1=(F_oo,Bar) and f2=(Foo, f_oo), no titles match without fuzzing
+  # but it is unclear whether f1's "F_oo" should match "Foo" or "f_oo" in f2.
+  # Nevertheless, we will pick one and if wrong then the user will get a
+  # "change" in every row.
+
+  my sub add_titles($$$) {
+    my ($hash, $level, $sh) = @_;
+    # Add titles (fuzzed to exactly the specified degree) to a hash unless
+    # already present, i.e. never trying a fuzzed title which matches
+    # a non-fuzzed (or less-fuzzed) title in the same file.
+    my $title_row = $sh->title_row
+         // return;
+    foreach my $cx (0..$sh->num_cols-1) {
+      my $title = $title_row->[$cx];
+      my $t = $title;
+      {                last if $level==0;
+        $t = fc($t);   last if $level==1;
+        $t =~ s/[_. ]|${\VISIBLE_SPACE}/-/g;
+                       last if $level==2;
+        ($t = fc $title) =~ s/\s+|${\VISIBLE_SPACE}//sg;
+                       last if $level==3;
+        $t =~ s/\W//g; last if $level==4;
+        oops
+      }
+      $hash->{$t} = $cx unless exists $hash->{$t};
+    }
+  }
+
+  my (@corresp_titles1, @corresp_titles2);
+  my (@corresp_cxlist1, @corresp_cxlist2);
+  my ($title_row1, $title_row2) = ($sh1->title_row, $sh2->title_row);
+  my ($hash1, $hash2) = ({}, {});
+  my (%cx1found, %cx2found);
+  for my $level (0..4) {
+    add_titles($hash1, $level, $sh1);
+    add_titles($hash2, $level, $sh2);
+    while (my ($ft,$cx1) = each %$hash1) {
+      next if $cx1found{$cx1};
+      if (defined(my $cx2 = delete $hash2->{$ft})) { # "matching" titles
+        oops(dvis '$cx1 $cx2 $ft\n$hash1\n$hash2\%cx1found\n%cx2found')
+          if $cx2found{$cx2};
+        $cx1found{$cx1} = $cx2found{$cx2} = 1;
+        delete $hash1->{$ft};
+        push @corresp_cxlist1, $cx1;
+        push @corresp_cxlist2, $cx2;
+        push @corresp_titles1, $title_row1->[$cx1] // oops;
+        push @corresp_titles2, $title_row2->[$cx2] // oops;
+      }
+    }
+    while (my ($ft,$cx2) = each %$hash2) {
+      next if $cx2found{$cx2};
+      if (defined(my $cx1 = delete $hash1->{$ft})) {
+        oops(dvis '$cx2 $cx1 $ft\n$hash2\n$hash1\%cx2found\n%cx1found')
+          if $cx1found{$cx1};
+        $cx2found{$cx2} = $cx1found{$cx1} = 2;
+        delete $hash2->{$ft};
+        push @corresp_cxlist1, $cx1;
+        push @corresp_cxlist2, $cx2;
+        push @corresp_titles1, $title_row1->[$cx1] // oops;
+        push @corresp_titles2, $title_row2->[$cx2] // oops;
+      }
+    }
+    last unless keys %$hash1; # stop if original titles all matched
+  }
+  oops unless @corresp_cxlist1 == @corresp_cxlist2;
+  oops unless @corresp_cxlist1 == @corresp_titles1;
+  oops unless @corresp_cxlist1 == @corresp_titles2;
+  { my @order = sort {$corresp_cxlist1[$a] <=> $corresp_cxlist1[$b]}
+                     0..$#corresp_cxlist1;
+    @corresp_cxlist1 = @corresp_cxlist1[@order];
+    @corresp_cxlist2 = @corresp_cxlist2[@order];
+    @corresp_titles1 = @corresp_titles1[@order];
+    @corresp_titles2 = @corresp_titles2[@order];
+  }
+  # Assume un-matched titles *in the same column* correspond
+  # (if there are no titles, then all columns correspond!)
+  # A collective title is synthesized for each pair.
+  # Otherwise unmatched titles are considered unpaired.
+  my (@unpaired_cxlist1, @unpaired_cxlist2);
+  for my $cx (0..($sh1->num_cols-1)) {
+    next if defined $cx1found{$cx};
+    if (!defined $cx2found{$cx} && $cx < $sh2->num_cols) {
+      $cx1found{$cx} = $cx2found{$cx} = 1;
+      push @corresp_cxlist1, $cx;
+      push @corresp_cxlist2, $cx;
+      my $synthetic_title = "(col ".cx2let($cx).")";
+      push @corresp_titles1, $synthetic_title;
+      push @corresp_titles2, $synthetic_title;
+    } else {
+      push @unpaired_cxlist1, $cx;
+    }
+  }
+  for my $cx (0..($sh2->num_cols-2)) {
+    next if defined $cx2found{$cx};
+    push @unpaired_cxlist2, $cx;
+  }
+  oops unless @corresp_cxlist1 + @unpaired_cxlist1 == $sh1->num_cols;
+  oops unless @corresp_cxlist1 + @unpaired_cxlist2 == $sh2->num_cols;
+
+  $sh1->attributes->{CORRESP_TITLES  } = \@corresp_titles1;
+  $sh1->attributes->{CORRESP_CXLIST  } = \@corresp_cxlist1;
+  $sh1->attributes->{UNPAIRED_CXLIST } = \@unpaired_cxlist1;
+
+  $sh2->attributes->{CORRESP_TITLES  } = \@corresp_titles2;
+  $sh2->attributes->{CORRESP_CXLIST  } = \@corresp_cxlist2;
+  $sh2->attributes->{UNPAIRED_CXLIST } = \@unpaired_cxlist2;
+
+  warn dvis '$title_row1\n$title_row2\n'
+           .'@corresp_titles1\n@corresp_titles2\n'
+           .'@corresp_cxlist1\n@corresp_cxlist2\n'
+           .'@unpaired_cxlist1\n@unpaired_cxlist2\n'
+    if $opts{debug};
+
+}#_pairup_columns
 
 sub compare_native {
   my $self = shift;
@@ -829,8 +989,8 @@ sub compare_native {
 
   for my $N (1, 2) {
     my $sh = $self->{"sheet$N"};
-    # Determine widest row in rows not preceeding title row (if any).
-    # Empty cells on the right end of a row are ignored for this purpose.
+    # Determine widest row in rows not preceeding title row (if any),
+    # excluding empty cells on the right end of a row.
     my $ndcols = 0;
     my $title_rx = $sh->title_rx;
     $sh->apply_all(sub{
@@ -839,7 +999,7 @@ sub compare_native {
       while ($n > 0 && $sh->crow->[$n-1] eq "") { --$n }
       $ndcols = max($ndcols, $n);
     });
-    $sh->attributes->{NUM_DATA_COLS} = $ndcols;
+    $sh->attributes->{NUMCOLS_USED} = $ndcols;
 
     # Translate --always-show and --id columns to cx values for each sheet
     foreach(['always_show_columns','ALWAYS_SHOW'],
@@ -856,132 +1016,28 @@ sub compare_native {
         }
       }
     }
-##    $self->preprocess_titles($sh);
-  }
-  my $sh1 = $self->{sheet1};
-  my $sh2 = $self->{sheet2};
-
-  my $title_row1 = $sh1->title_row; # undef if no titles
-  my $title_row2 = $sh2->title_row;
-
-  my sub _titlerow_msg {
-    my $sh = shift;
-    my $rx = $sh->title_rx;
-    defined($rx) ? "--title-row ".($rx+1) : "NO --title-row"
-  }
-  if (!defined($self->{title_row})) {
-    if ($self->{verbose}) {
-      if (u($sh1->title_rx) eq u($sh2->title_rx)) {
-        warn "> Auto-detected ", _titlerow_msg($sh1), " in both\n";
-      } else {
-        warn "> Auto-dtected DIFFERENT title rows:\n";
-        for my $N(1,2) {
-          my $sh = $self->{"sheet$N"};
-          warn ">   ",_titlerow_msg($sh), " in ", $sh->data_source, "\n";
-        }
-      }
-    }
-  } else {
-    confess "bug"
-      ,vis($sh1->attributes())
-      if $self->{title_row}==0 && defined( $sh1->title_rx );
   }
 
-  # Find corresponding (possibly-rearranged) columns
-  my sub fuzzy_match($$$$) {
-    my ($A_sheet, $B_sheet, $A_cxfound, $B_cxfound) = @_;
-    my $A_maxcx = $A_sheet->num_cols - 1;
-    my $B_maxcx = $B_sheet->num_cols - 1;
-    my $A_colx = $A_sheet->colx;
-    my $B_colx = $B_sheet->colx;
-    my $A_title_row = $A_sheet->title_row;
-    my $B_title_row = $B_sheet->title_row;
-    for my $A_cx (0..$A_maxcx) {
-      next if $A_cxfound->{$A_cx};
-      my $A_title = $A_title_row->[$A_cx];
-      my $B_cx;
-      FUZZ: {
-        for my $fuzzer ( sub{$_[0]},
-                         sub{fc($_[0] =~ s/\s|${\VISIBLE_SPACE}//gr)}, 
-                         sub{fc($_[0])}, 
-                         sub{fc($_[0] =~ s/[\s\.;:,]|${\VISIBLE_SPACE}//gr)} ) {
-          my $B_title = $fuzzer->($A_title);
-          if (defined($B_cx = $B_colx->{$B_title})) {
-            if ($B_title eq $A_title
-                || !defined($A_colx->{$B_title})) { # must be unique
-              # Found corresponding columns
-              oops if $B_cxfound->{$B_cx};
-              $A_cxfound->{$A_cx} = $B_cx;
-              $B_cxfound->{$B_cx} = $A_cx;
-              last FUZZ;
-            }
-          }
-        }
-      }
-    }  
-  }#fuzzy_match
-  my (@corresp_titles1, @corresp_titles2);
-  my (@corresp_cxlist1, @corresp_cxlist2);
-  my (@unpaired_cxlist1, @unpaired_cxlist2);
-  { my (%cxfound1, %cxfound2);
-    fuzzy_match($sh1, $sh2, \%cxfound1, \%cxfound2);
-    fuzzy_match($sh2, $sh1, \%cxfound2, \%cxfound1);
-    for my $cx1 (0..($sh1->num_cols-1)) {
-      if (!defined $cxfound1{$cx1} && !defined $cxfound2{$cx1}) {
-        # Assume un-matched titles *in the same column* correspond
-        # (if there are no titles, then all columns correspond).
-        # A collective title is synthesized for each pair.
-        $cxfound1{$cx1} = $cx1;
-        $cxfound2{$cx1} = $cx1;
-        push @corresp_cxlist1, $cx1;
-        push @corresp_cxlist2, $cx1;
-        my $synthetic_title = "(col ".cx2let($cx1).")";
-        push @corresp_titles1, $synthetic_title;
-        push @corresp_titles2, $synthetic_title;
-        next;
-      }
-      if (defined(my $cx2 = $cxfound1{$cx1})) {
-        push @corresp_cxlist1, $cx1;
-        push @corresp_cxlist2, $cx2;
-        push @corresp_titles1, $title_row1->[$cx1] // oops;
-        push @corresp_titles2, $title_row2->[$cx2] // oops;
-      } else {
-        push @unpaired_cxlist1, $cx1;
-      }
-    }
-    for my $cx2 (0..($sh2->num_cols-2)) {
-      if (!defined $cxfound2{$cx2}) {
-        push @unpaired_cxlist2, $cx2;
-      }
-    }
-  } 
-  oops unless @corresp_cxlist1 == @corresp_cxlist2;
-  oops unless @corresp_cxlist1 == @corresp_titles1;
-  oops unless @corresp_cxlist1 == @corresp_titles2;
+  $self->_check_title_rows();
 
-  $sh1->attributes->{CORRESP_TITLES  } = \@corresp_titles1;
-  $sh1->attributes->{CORRESP_CXLIST  } = \@corresp_cxlist1;
-  $sh1->attributes->{UNPAIRED_CXLIST } = \@unpaired_cxlist1;
-  
-  $sh2->attributes->{CORRESP_TITLES  } = \@corresp_titles2;
-  $sh2->attributes->{CORRESP_CXLIST  } = \@corresp_cxlist2;
-  $sh2->attributes->{UNPAIRED_CXLIST } = \@unpaired_cxlist2;
-
-  warn dvis '$title_row1\n$title_row2\n'
-           .'@corresp_titles1\n@corresp_titles2\n'
-           .'@corresp_cxlist1\n@corresp_cxlist2\n'
-           .'@unpaired_cxlist1\n@unpaired_cxlist2\n'
-    if $opts{debug};
+  # Set attributes CORRESP_TITLES, CORRESP_CXLIST, and UNPAIRED_CXLIST
+  $self->_pairup_columns();
 
   my $restricted_keycols = @{$self->{id_columns}} > 0;
 
-  # Corresponding columns, throwing new/leftover cols at the end in orig order
   my @cxlist1 = ( @{ $self->{sheet1}->attributes->{CORRESP_CXLIST} // [] },
-                  @{ $self->{sheet1}->attributes->{UNPAIRED_CXLIST}     } );
+                  @{ $self->{sheet1}->attributes->{UNPAIRED_CXLIST}     }
+                );
   my @cxlist2 = ( @{ $self->{sheet2}->attributes->{CORRESP_CXLIST} // [] },
-                  @{ $self->{sheet2}->attributes->{UNPAIRED_CXLIST}     } );
+                  @{ $self->{sheet2}->attributes->{UNPAIRED_CXLIST}     }
+                );
 
-  # Corresponding columns, limited to --id-columns
+  # FIXME: What is difference between unmatched-in-same-columm
+  #  pairs in CORRESP_CXLIST and UNPAIRED_CXLIST ??
+  #  If *all* unmatched were just put into UNPAIRED_CXLIST in cx order,
+  #  I think they would line up exactly the same way as we get here...
+
+  # Corresponding columns, limited to --id-columns if specified, otherwise all
   my (@idcxlist1, @idcxlist2);
   if ($restricted_keycols) {
     @idcxlist1 = sort {$a <=> $b}
@@ -1001,7 +1057,7 @@ sub compare_native {
   # save information in globals (declared with "our") for later use
   # by hashid-func or hash-func.  All these user-defined functions
   # are compiled into package Usercode.
-  # TODO: Should this be moved before all the setup above?
+  # FIXME: Probably too late for this to be useful. UNDOCUMENTING for now...
   $setup_code_code->( $self->{"sheet1"},
                       $self->{"sheet2"},
                       \@idcxlist1,
@@ -1009,11 +1065,31 @@ sub compare_native {
                     );
 
   my $keygen = sub{
-    # Form a hash of values to diff, first from columns we can identify
-    # as corresponding, and then any other columns.  If one file has fewer
-    # columns than the other, the narrower rows are padded with empty strings.
+    # Form a hash of the contents of the "id columns" in a given row
+    # (or all columns in the absence of --id-column arguments).
+    #
+    # The Diff algorithm is run using only these hash values, and so rows
+    # which represent the same record (i.e. same 'id' values) will
+    # be reported as "unchanged" even though they may differ in other columns,
+    # and other kinds of hunks represent additions or deletions of identities
+    # to the data.
+    #
+    # OTOH, if there ARE NO ID columns, then the hash covers all columns
+    # and only completely-identical rows are reported as "unchanged"
+    # and changes may be reported as add, delete, or replace in a somewhat
+    # unpredictable way (which is why using --id-columns is helpful).
+    #
+    # This processing occurs in _native_output()
+    #
+    # If one file has fewer columns than the other, the narrower rows are
+    # padded with empty strings.
     my ($N, $row, $orig_rx) = @{ $_[0] };
     my $sh = $self->{"sheet$N"};
+    if ($orig_rx eq u($sh->title_rx)) {
+      # Return a special token to force title rows to "match".  This makes
+      # changes in titles appear as a "change" and not "delete" + "add".
+      return " __TITLE_ROW__ ";
+    }
     my $idcxlist  = ($N==1 ? \@idcxlist1  : \@idcxlist2);
     my $idpadding = ($N==1 ? \@idpadding1 : \@idpadding2);
 
@@ -1057,7 +1133,7 @@ sub compare_native {
   my $changed = $self->_native_output(\@cxlist1, \@cxlist2, $diff, 1);
 
   if ($changed) {
-    print "\n",$self->{sheetname_header};  # possibly ""
+    print $self->{sheetname_header};  # possibly ""
     $diff->Reset;
     my $changed2 = $self->_native_output(\@cxlist1, \@cxlist2, $diff, 0);
     oops if $changed2 != $changed;
@@ -1072,16 +1148,6 @@ sub compare_native {
   }
   $self->{exit_status} = ($changed ? 1 : 0);
 }
-
-##sub preprocess_titles {
-##  my ($self, $sh) = @_;
-##
-##  # OLD CRUFT: [Auto-detection is no longer lazy: It happens only when
-##  #   read_spreadsheet is called or (if read_spreadsheet was called with
-##  #   title_rx=>undef) when title_rx is called; so the following is BOGUS!]
-##  #
-##
-##}
 
 # Format a value for display as an indented block.
 # Newlines in the input are already converted to visible "\n".
@@ -1098,7 +1164,7 @@ sub fmt_value($$) {
   if ($maxwidth) { # fold
     my $first_mw = $maxwidth - $indent_width;
     if (length($str) > $first_mw) {
-      oops "maxwidth $maxwidth is too narrow\nfmw=$first_mw iw=$indent_width <<$str>>" 
+      oops "maxwidth $maxwidth is too narrow\nfmw=$first_mw iw=$indent_width <<$str>>"
         if $first_mw < 20;  # sanity
       $str =~ s/\A([^\n]{$first_mw})([^\n]+)/$1\n${indent}$2/m;
       while ($str =~ s/^([^\n]{$maxwidth})([^\n]+)/$1\n${indent}$2/m) { }
@@ -1135,7 +1201,7 @@ sub show_cell {
     }
     return
   }
-  
+
   my $twidth = (2+$widest_title_width);  # 2 for indent
 
   my $v1str = fmt_value($v1, $twidth+3); # +3 for the ": '"
@@ -1209,7 +1275,7 @@ sub show_row {
   my ($self, $N, $row, $curr_rx, $verb, $dumbrun) = @_; oops if @_ != 6;
   my $sh = $self->{"sheet$N"};
   my $orig_rx = $sh->attributes->{ORIGINAL_RXS}->[$curr_rx] // $curr_rx;
-  unless ($dumbrun) { 
+  unless ($dumbrun) {
     print row_header($verb, $orig_rx);
   }
   my sub ABC_label {
