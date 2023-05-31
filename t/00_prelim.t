@@ -29,20 +29,20 @@ ok(-x $progpath, "Found the script");
 # Test arg help
 { my ($out, $err, $wstat) = capture{ run_perlscript $progpath };
 
-  ok($out eq "", "$progname sans args -> silent on stdout but...")
-    &&
-  like($err, qr/Usage/, "$progname sans args -> Usage on stderr")
-    || diag dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat);
+  ok($out eq "", "$progname sans args -> silent on stdout but...",
+       dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
+    
+  like($err, qr/Usage/, "$progname sans args -> Usage on stderr",
+         dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
 }
 
 { my ($out, $err, $wstat) = capture{ run_perlscript $progpath, "-h" };
 
-  like($out, qr/NAME.*SYNOPSIS.*OPTIONS/s, 
-       "$progname -h => Extended help on stdout")
-    || diag dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat);
+  like($out, qr/NAME.*SYNOPSIS.*OPTIONS/s, "$progname -h => Extended help on stdout",
+         dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
 
-  ok($err eq "", "$progname -h => nothing on stderr")
-    || diag dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat);
+  ok($err eq "", "$progname -h => nothing on stderr",
+       dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
 }
 
 # Detecting functional errors
@@ -51,8 +51,11 @@ ok(-x $progpath, "Found the script");
     die "oops" if -e $nepath;
     run_perlscript $progpath, devnull(), $nepath;
   };
-  ok($out eq "", "$progname diags should only be on stderr");
-  like($err,qr/\Q$nepath\E.*(missing|no such)/i, "$progname catches non-existent file");
+  ok($out eq "", "$progname diags should only be on stderr",
+       dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
+  
+  like($err, qr/\Q$nepath\E.*(missing|no such)/i, "$progname catches non-existent file",
+       dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
 }
 
 done_testing;
