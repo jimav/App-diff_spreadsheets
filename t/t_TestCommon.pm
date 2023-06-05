@@ -4,7 +4,7 @@
 # related or neighboring rights to the content of this file.
 # Attribution is requested but is not required.
 
-# t_TestCommon -- setup and tools specifically for tests. 
+# t_TestCommon -- setup and tools specifically for tests.
 #
 #   Everything not specifically test-related is in the separate
 #   module t_Common (which is not necessairly just for tests).
@@ -41,29 +41,38 @@ BEGIN{
   confess "Test::More already loaded!" if defined( &Test::More::ok );
   confess "Test2::V0 already loaded!" if defined( &Test2::V0::import );
 
-  binmode(STDIN, ":encoding(UTF-8)");
-  binmode(STDOUT, ":encoding(UTF-8)");
-  binmode(STDERR, ":encoding(UTF-8)");
+  # Force UTF-8 (and remove any other encoder) regardless of the 
+  # environment/terminal.  This allows tests to use capture {...} and check 
+  # the results independent of the environment, even if when printed the 
+  # results may be garbled.
+  binmode(STDIN, ":raw:encoding(UTF-8):crlf");
+  if ($^O eq "MSWin32") {
+    binmode(STDOUT, ":raw:encoding(UTF-8)");
+    binmode(STDERR, ":raw:encoding(UTF-8)");
+  } else {
+    binmode(STDOUT, ":raw:crlf:encoding(UTF-8)");
+    binmode(STDERR, ":raw:crlf:encoding(UTF-8)");
+  }
 
   # Disable buffering
   STDERR->autoflush(1);
   STDOUT->autoflush(1);
 }
 use Test2::V0 (); # a huge collection of tools
-require Test2::Plugin::BailOnFail; 
+require Test2::Plugin::BailOnFail;
 use POSIX ();
 
 require Exporter;
 use parent 'Exporter';
 our @EXPORT = qw/silent
-                 bug 
+                 bug
                  t_ok t_is t_like
                  ok_with_lineno is_with_lineno like_with_lineno
-                 rawstr showstr showcontrols displaystr 
+                 rawstr showstr showcontrols displaystr
                  show_white show_empty_string
-                 fmt_codestring 
-                 verif_no_internals_mentioned 
-                 insert_loc_in_evalstr verif_eval_err 
+                 fmt_codestring
+                 verif_no_internals_mentioned
+                 insert_loc_in_evalstr verif_eval_err
                  timed_run
                  mycheckeq_literal expect1 mycheck _mycheck_end
                  arrays_eq hash_subset
@@ -78,10 +87,11 @@ use Data::Dumper;
 use Cwd qw/getcwd abs_path/;
 use POSIX qw/INT_MAX/;
 use File::Basename qw/dirname/;
+use Env qw/@PATH @PERL5LIB/;  # ties @PATH, @PERL5LIB
 
 sub bug(@) { @_=("BUG FOUND:",@_); goto &Carp::confess }
 
-# Parse manual-testing args from @ARGV 
+# Parse manual-testing args from @ARGV
 my @orig_ARGV = @ARGV;
 our ($debug, $verbose, $silent, $nonrandom);
 use Getopt::Long qw(GetOptions);
@@ -110,7 +120,7 @@ if ($nonrandom) {
     $ENV{PERL_PERTURB_KEYS} = "2"; # deterministic
     $ENV{PERL_HASH_SEED} = "0xDEADBEEF";
     #$ENV{PERL_HASH_SEED_DEBUG} = "1";
-    $ENV{PERL5LIB} = join(":", @INC);
+    @PERL5LIB = @INC; # cf 'use Env' above
     exec $^X, $0, @orig_ARGV; # for reproducible results
   }
 }
@@ -124,7 +134,7 @@ sub import {
 
   # Test2::V0
   #  Do not import warnings, to avoid un-doing prior settings.
-  #  Do not inport 1- and 2- or 3- character upper-case names, which are 
+  #  Do not inport 1- and 2- or 3- character upper-case names, which are
   #  likely to clash with user variables and/or spreadsheet column letters
   #  (when using Spreadsheet::Edit).
   Test2::V0->import::into($target,
@@ -163,23 +173,27 @@ sub hash_subset($@) {
   return { map { exists($hash->{$_}) ? ($_ => $hash->{$_}) : () } @keys }
 }
 
-# string_to_tempfile($string, args => for-mytempfile) 
+# string_to_tempfile($string, args => for-mytempfile)
 # string_to_tempfile($string, pseudo_template) # see mytempfile
 #
 sub string_to_tempfile($@) {
   my ($string, @tfargs) = @_;
   my ($fh, $path) = mytempfile(@tfargs);
   dprint "> Creating $path\n";
-  print $fh $string; 
+  print $fh $string;
   $fh->flush;
   seek($fh,0,0) or die "seek $path : $!";
   wantarray ? ($path,$fh) : $path
 }
 
-# Run a Perl script in a sub-process.
-# Plain 'system  path/to/script.pl' does not work in a test environment
-# where the correct Perl executable is not at the front of PATH,
-# and also where -I options might have supplied library paths.
+# Run a Perl script in a sub-process, forcing UTF-8 encoding.
+#
+# -CIOE is passed and LANG is unconditionally set to indicate UTF-8 stdio 
+# regardless of the actual test environment.  This is because the output 
+# will be consumed by a test checker rather than actually displayed 
+# on the real STDOUT/ERR (except for debugging, when results may be garbled).
+#
+# Also provides -I options to mimic @INC (PERL5LIB is often not set)
 #
 # This is usually enclosed in Tiny::Capture::capture { ... }
 #    ==> IMPORTANT: Be sure STDOUT/ERR has :encoding(...) set beforehand
@@ -187,10 +201,43 @@ sub string_to_tempfile($@) {
 #        Otherwise wide chars will be corrupted
 #
 sub run_perlscript(@) {
-  my @perlargs = @_;  # might be ('-e', 'perlcode...')
+  my $tf; # keep in scope until no longer needed
+  my @perlargs = ("-CIOE", @_);
+  @perlargs = ((map{ "-I$_" } @INC), @perlargs);
   unshift @perlargs, "-MCarp=verbose" if $Carp::Verbose;
-  local $ENV{PERL5LIB} = join(":", @INC);
-  system $^X, @perlargs;
+  unshift @perlargs, "-MCarp::Always=verbose" if $Carp::Always::Verbose;
+  if ($^O eq "MSWin32") {
+    for (my $ix=0; $ix <= $#perlargs; $ix++) {
+      if ($perlargs[$ix] =~ /^-w?[Ee]$/) {
+        # Passing perl code in an argument is impractical in DOS/Windows
+        $tf = Path::Tiny->tempfile("perlcode_XXXXX");
+        $tf->spew_utf8($perlargs[$ix+1]);
+        splice(@perlargs, $ix, 2, $tf->stringify);
+      }
+      for ($perlargs[$ix]) {
+        if (/^-\*[Ee]/) { oops "unhandled perl arg" }
+        s/"/\\"/g;
+        if (/[\s\/"']/) {
+          $_ = '"' . $_ . '"';
+        }
+      }
+    }
+  }
+  delete local $ENV{LC_ALL};
+  local $ENV{LANG} = "C.UTF-8";
+  if ($debug) {
+    my $msg = "%%% run_perlscript >";
+    for my $k (sort keys %ENV) { 
+      next unless $k =~ /^(LC|LANG)/;
+      $msg .= " $k='$ENV{$k}'" 
+    }
+    $msg .= " $^X";
+    $msg .= " '${_}'" foreach (@perlargs);
+    print STDERR "$msg\n";
+  }
+  my $wstat = system $^X, @perlargs;
+  print STDERR "%%%(returned from 'system', wstat=",sprintf("0x%04X",$wstat),")%%%\n" if $debug;
+  $wstat
 }
 
 #--------------- :silent support ---------------------------
@@ -236,12 +283,12 @@ sub _start_silent() {
   $silent_mode = 1;
 
   $orig_DIE_trap = $SIG{__DIE__};
-  $SIG{__DIE__} = sub{ 
+  $SIG{__DIE__} = sub{
     return if $^S or !defined($^S);  # executing an eval, or Perl compiler
-    my @diemsg = @_; 
+    my @diemsg = @_;
     my $err=_finish_silent(); warn $err if $err;
     die @diemsg;
-  }; 
+  };
 
   my @OUT_layers = grep{ $_ ne "unix" } PerlIO::get_layers(*STDOUT, output=>1);
   open($orig_stdOUT, ">&", \*STDOUT) or die "dup STDOUT: $!";
@@ -283,32 +330,40 @@ END{
 }
 #--------------- (end of :silent stuff) ---------------------------
 
-# N.B. package dir might have version like ".../ODF-lpOD_Helper-3.008/..."
-dirname(abs_path(__FILE__)) =~ m#.*/(\w+)-\w[-\w\.]*/# or die "Cant intuit testee module name";
-(my $testee_top_module = $1) =~ s/-/::/g;
+# Find the ancestor build or checkout directory (it contains a "lib" subdir)
+# and derive the package name from e.g. "My-Pack" or "My-Pack-1.234"
+my $testee_top_module;
+for (my $path=path(__FILE__)->absolute;  ; $path=$path->parent) {
+  if (-d $path->child("lib")) {
+    my @pieces = split /-/, $path->basename;
+    if ($pieces[-1] =~ /^\d/) { pop @pieces } # pop version
+    $testee_top_module = join('::', @pieces);
+    last;
+  }
+}
 oops unless $testee_top_module;
 
 sub verif_no_internals_mentioned($) { # croaks if references found
   my $original = shift;
-  return if $Carp::Verbose; 
+  return if $Carp::Verbose;
 
   local $_ = $original;
 
   # Ignore glob refs like \*{"..."}
   s/(?<!\\)\\\*\{"[^"]*"\}//g;
-  
+
   # Ignore globs like *main::STDOUT or *main::$f
   s/(?<!\\)\*\w[\w:\$]*\b//g;
-  
+
   # Ignore object refs like Some::Package=THING(hexaddr)
   s/(?<!\w)\w[\w:\$]*=(?:REF|ARRAY|HASH|SCALAR|CODE|GLOB)\(0x[0-9a-f]+\)//g;
-  
+
   # Ignore Data::Dumper::addrvis output like Some::Package<dec:hex>
   s/(?<!\w)\w[\w:\$]*<\d+:[\da-f]+>//g;
-  
+
   # Mask references to our test library files named t_something.pm
   s#\b(\bt_\w+).pm(\W|$)#<$1 .pm>$2#gs;
-  
+
   my $msg;
   if (/\b(?<hit>${testee_top_module}::[\w:]*)/) {
     $msg = "ERROR: Log msg or traceback mentions internal package '$+{hit}'"
@@ -321,7 +376,7 @@ sub verif_no_internals_mentioned($) { # croaks if references found
     my $end   = $+[1]; # offset of end+1
     substr($_,$start,0) = "HERE>>>";
     substr($_,$end+7,0) = "<<<THERE";
-    local $Carp::Verbose = 0;  # no full traceback 
+    local $Carp::Verbose = 0;  # no full traceback
     $Carp::CarpLevel++;
     croak $msg, ":\n«$_»\n";
   }
@@ -365,14 +420,14 @@ sub showstr(_) {
   if (defined &Data::Dumper::Interp::visnew) {
     return visnew->Useqq("unicode")->vis(shift);
   } else {
-    # I don't want to require Data::Dumper::Interp to be 
+    # I don't want to require Data::Dumper::Interp to be
     # loaded although it will be if t_Common.pm was used also.
     return showcontrols(shift);
   }
 }
 
 # Show the raw string in French Quotes.
-# If STDOUT is not UTF-8 encoded, also show D::D hex escapes 
+# If STDOUT is not UTF-8 encoded, also show D::D hex escapes
 # so we can still see something useful in output from non-Unicode platforms.
 sub displaystr($) {
   my ($input) = @_;
@@ -516,14 +571,14 @@ sub _expstr2restr($) {
 
   $_
 }
-sub expstr2re($) { 
+sub expstr2re($) {
   my $input = shift;
   my $xdesc; # extra debug description of intermediates
   my $output;
   if ($input !~ m#qr/|"::#) {
     # doesn't contain variable-representation items
     $output = $input;
-    $xdesc = ""; 
+    $xdesc = "";
   } else {
     my $s = _expstr2restr($input);
     my $saved_dollarat = $@;
@@ -615,7 +670,7 @@ sub insert_loc_in_evalstr($) {
 sub timed_run(&$@) {
   my ($code, $maxcpusecs, @codeargs) = @_;
 
-  my $getcpu = eval {do{ 
+  my $getcpu = eval {do{
     require Time::HiRes;
     () = (&Time::HiRes::clock());
     \&Time::HiRes::clock;

@@ -98,9 +98,11 @@ sub import {
 
   require File::Spec;
   require File::Spec::Functions;
+  # Do *not* import 'devnull' as it doesn't really work on Windows,
+  # at least not as the input to File::Copy::copy (fails with "No such file")
   File::Spec::Functions->import::into($target, qw/
     canonpath catdir catfile curdir rootdir updir
-    no_upwards file_name_is_absolute devnull tmpdir splitpath splitdir 
+    no_upwards file_name_is_absolute tmpdir splitpath splitdir 
     abs2rel rel2abs case_tolerant/);
 
   require Path::Tiny;
