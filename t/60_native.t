@@ -6,9 +6,9 @@ use t_TestCommon qw/bug run_perlscript/; # Test2::V0 etc.
 # N.B. Can not use :silent because it breaks Capture::Tiny
 use t_dsUtils qw/runtest $progname $progpath/;
 
-use File::Which qw/which/;
-if (! which("loffice")) {
-  plan(skip_all => "Libre Office is not installed");
+use Spreadsheet::Edit::IO ();
+if (!Spreadsheet::Edit::IO::spreadsheets_ok()) {
+  plan(skip_all => "External tools (Libre Office) not installed");
 }
 
 my $tlib = "$Bin/../tlib";
@@ -70,7 +70,7 @@ runtest("$tlib/Multisheet.xlsx",
         "$tlib/Multisheet2.xlsx",
         qr/.* \*\*\*\ *Sheet.*OtherSheetA.*exists\ ONLY\ in.*Multisheet.xlsx
            .* \*\*\*\ *Sheet.*OtherSheetB.*exists\ ONLY\ in.*Multisheet2.xlsx
-           .* \*\*\*\ *AddrListSheet\ *\*\*\*
+           .* \*\*\*\ *SHEET\ "?AddrListSheet"?\ *\*\*\*
            .* ----*\ Changed\ +row\ +3\ .*
            .* CITY.*:.*'bogon'
           /isx, "", 2,

@@ -6,7 +6,6 @@ use t_TestCommon qw/bug run_perlscript $silent $debug/; # Test2::V0 etc.
 # N.B. Can not use :silent because it breaks Capture::Tiny
 
 use Capture::Tiny qw/capture/;
-use File::Which qw/which/;
 use Env qw/@PERL5LIB/; # ties @PERL5LIB
 
 my $progname = "diff_spreadsheets";

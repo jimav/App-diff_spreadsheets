@@ -9,8 +9,10 @@
 #   Everything not specifically test-related is in the separate
 #   module t_Common (which is not necessairly just for tests).
 #
-#   Loads Test2::V0, which sets UTF-8 encoding/decoding for test-harnes
-#   streasm (but *not* STD* or new filehandles).  And imports 'utf8'.
+#   Loads Test2::V0 (except with ":no-Test2"), which sets UTF-8 enc/dec
+#   for test-harnes streams (but *not* STD* or new filehandles).
+#
+#   Imports 'utf8' so scripts can be written in UTF-8 encoding
 #
 #   Makes STDIN, STDOUT & STDERR UTF-8 auto de/encode
 #
@@ -58,9 +60,9 @@ BEGIN{
   STDERR->autoflush(1);
   STDOUT->autoflush(1);
 }
-use Test2::V0 (); # a huge collection of tools
-require Test2::Plugin::BailOnFail;
 use POSIX ();
+use utf8;
+use JSON ();
 
 require Exporter;
 use parent 'Exporter';
@@ -128,6 +130,16 @@ if ($nonrandom) {
 sub import {
   my $target = caller;
 
+  my %tags;
+  for (my $ix=0; $ix <= $#_; $ix++) {
+    if ($_[$ix] =~ /^(:.*)$/) {
+      next if $_[$ix] eq ":DEFAULT"; # ok, pass thru to Exporter
+      $tags{$1} = 1;
+      splice @_, $ix, 1, ();
+      redo unless $ix > $#_;
+    }
+  }
+
   # Do an initial read of $[ so arybase will be autoloaded
   # (prevents corrupting $!/ERRNO in subsequent tests)
   eval '$[' // die;
@@ -137,18 +149,23 @@ sub import {
   #  Do not inport 1- and 2- or 3- character upper-case names, which are
   #  likely to clash with user variables and/or spreadsheet column letters
   #  (when using Spreadsheet::Edit).
-  Test2::V0->import::into($target,
-    -no_warnings => 1,
-    (map{ "!$_" } "A".."AAZ")
-  );
+  unless (delete $tags{":no-Test2"}) {
+    require Test2::V0; # a huge collection of tools
+    require Test2::Plugin::BailOnFail;
+    Test2::V0->import::into($target,
+      -no_warnings => 1,
+      (map{ "!$_" } "A".."AAZ")
+    );
+    # Stop on the first error
+    Test2::Plugin::BailOnFail->import::into($target);
+  }
+  utf8->import::into($target);
 
-  # Stop on the first error
-  Test2::Plugin::BailOnFail->import::into($target);
-
-  if (grep{ $_ eq ':silent' } @_) {
-    @_ = grep{ $_ ne ':silent' } @_;
+  if (delete $tags{":silent"}) {
     _start_silent() unless $debug;
   }
+
+  die "Unhandled tag ",keys(%tags) if keys(%tags);
 
   # chain to Exporter to export any other importable items
   goto &Exporter::import
@@ -333,11 +350,16 @@ END{
 # Find the ancestor build or checkout directory (it contains a "lib" subdir)
 # and derive the package name from e.g. "My-Pack" or "My-Pack-1.234"
 my $testee_top_module;
-for (my $path=path(__FILE__)->absolute;  ; $path=$path->parent) {
-  if (-d $path->child("lib")) {
-    my @pieces = split /-/, $path->basename;
-    if ($pieces[-1] =~ /^\d/) { pop @pieces } # pop version
-    $testee_top_module = join('::', @pieces);
+for (my $path=path(__FILE__); 
+             $path ne Path::Tiny->rootdir; $path=$path->parent) {
+  if (-e (my $p = $path->child("dist.ini"))) {
+    $p->slurp() =~ /^ *name *= *(\S+)/i or oops;
+    ($testee_top_module = $1) =~ s/-/::/g;
+    last
+  }
+  if (-e (my $p = $path->child("MYMETA.json"))) {
+    $testee_top_module = JSON->new->decode($p->slurp())->{name};
+    $testee_top_module =~ s/-/::/g;
     last;
   }
 }
@@ -391,7 +413,7 @@ sub show_white(_) { # show whitespace which might not be noticed
   return "(Is undef)" unless defined;
   s/\t/<tab>/sg;
   s/( +)$/"<space>" x length($1)/seg; # only trailing spaces
-  s/\n/<newline>\n/sg;
+  s/\R/<newline>\n/sg;
   show_empty_string $_
 }
 
@@ -648,7 +670,7 @@ sub verif_eval_err(;$) {  # MUST be called on same line as the 'eval'
   confess "expected error did not occur at $fn line $ln\n",
     unless $ex;
 
-  if ($ex !~ / at $fn line $ln\.?(?:$|\n)/s) {
+  if ($ex !~ / at \Q$fn\E line $ln\.?(?:$|\R)/s) {
     confess "Got UN-expected err (not ' at $fn line $ln'):\n«$ex»\n",
             "\n";
   }

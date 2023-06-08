@@ -167,14 +167,13 @@ GetOptions(
    "n|rcs"                     => sub{ push @diff_opts, "-$_[0]"; },
    "output-encoding=s"         => sub{ $opts{output_encoding} = $_[1] },
    "p|show-c-function"         => sub{ push @diff_opts, "-$_[0]"; },
-   "quiet"                     => sub{ $opts{quiet} = $_[1] },
+   "quiet|silent"              => sub{ $opts{silent} = $_[1] },
    "quote-char=s"              => sub{ $opts{quote_char} = $_[1] },
    "q|brief"                   => sub{ push @diff_opts, "-$_[0]"; },
    "sep-char=s"                => sub{ $opts{sep_char} = $_[1] },
    "setup-code=s"              => sub{ $opts{setup_code} = $_[1] },
    "sheets=s"                  => sub{ push @{$opts{sheet_names}}, $_[1] },
    "show-empties"              => sub{ $opts{show_empties} = $_[1] },
-   "silent"                    => sub{ $opts{silent} = $_[1] },
    "sort-rows!"                => sub{ $opts{sort_rows} = $_[1] }, # allow --no-sort
    "speed-large-files"         => sub{ push @diff_opts, "-$_[0]"; },
    "strip-trailing-cr"         => sub{ push @diff_opts, "-$_[0]"; },
@@ -270,7 +269,9 @@ foreach my $N (1,2) {
   my $h = convert_spreadsheet($origpath, cvt_to=>"csv",
                                          allsheets => !$sheet_from_path,
                                          outpath => $dir,
-                                         debug => $opts{debug},
+                                         silent  => $opts{silent},
+                                         verbose => $opts{debug},
+                                         debug   => $opts{debug},
                              );
   $opts{cvt_from} = $h->{cvt_from};
   if ($h->{cvt_from} =~ /csv/i && !openhandle($origpath)) {
@@ -309,8 +310,8 @@ my $onlyone = @{ $opts{"csvpaths1"} } == 1 && @{ $opts{"csvpaths2"} } == 1;
 # same-named sheets.
 
 my $status = 0;
-$opts{sheetname_header} = "";
-my @pairs;  # { n1 n2 label1 label2 sheetname_header }
+$opts{sheetname_str} = "";
+my @pairs;  # { n1 n2 label1 label2 sheetname_str }
 if (@{$opts{sheet_names}//[]}) {
   # Sheet names were specified; corresponding sheets might have different
   # names if the user specified a regex.
@@ -328,17 +329,16 @@ if (@{$opts{sheet_names}//[]}) {
       die "'$spec' matches multiple sheet names in $opts{origpath2}\n"
         if @names2 > 1;
       push @pairs, { n1 => $names1[0], n2 => $names2[0],
-                     sheetname_header => $names1[0] eq $names2[0]
-                                 ? "*** sheet ".qsh($names1[0])." ***\n"
-                                 : "*** sheet ".qsh($names1[0])."/".qsh($names2[0])." ***\n"
+                     sheetname_str => $names1[0] eq $names2[0]
+                                 ? vis($names1[0])
+                                 : vis($names1[0])."/".vis($names2[0])
                    };
     } else {
       die "sheet '$spec' does not exist in $opts{origpath1}\n"
         unless $opts{sheet2csvpath1}{$spec};
       die "sheet '$spec' does not exist in $opts{origpath2}\n"
         unless $opts{sheet2csvpath2}{$spec};
-      push @pairs, { n1 => $spec, n2 => $spec,
-                     sheetname_header => "*** sheet ".qsh($spec)." ***\n" };
+      push @pairs, { n1 => $spec, n2 => $spec, sheetname_str => vis($spec) };
     }
   }
 }
@@ -360,8 +360,7 @@ else {
       $status = max($status, 2);
       next;
     }
-    push @pairs, { n1 => $name, n2 => $name,
-                   sheetname_header => "*** ".qsh($name)." ***\n" };
+    push @pairs, { n1 => $name, n2 => $name, sheetname_str => vis($name) };
   }
   foreach my $name (sort keys %{ $opts{sheet2csvpath2} }) {
     unless ($opts{sheet2csvpath1}{$name}) {
@@ -373,8 +372,8 @@ else {
 }
 
 foreach my $h (@pairs) {
-  my ($name1, $name2, $label1, $label2, $sheetname_header)
-              = @$h{qw/n1 n2 label1 label2 sheetname_header/};
+  my ($name1, $name2, $label1, $label2, $sheetname_str)
+              = @$h{qw/n1 n2 label1 label2 sheetname_str/};
   # If no labels provided, default to "/path/to/file.xls[sheetname]"
   $label1 //= form_spec_with_sheetname($opts{origpath1}, $name1);
   $label2 //= form_spec_with_sheetname($opts{origpath2}, $name2);
@@ -383,7 +382,7 @@ foreach my $h (@pairs) {
   $opts{path2} = $opts{sheet2csvpath2}{$name2} // die;
   $opts{label1} = $label1;
   $opts{label2} = $label2;
-  $opts{sheetname_header} = $sheetname_header // "";
+  $opts{sheetname_str} = $sheetname_str // "";
   $status = max($status, &process_pair);
 }
 
@@ -392,7 +391,7 @@ exit $status;
 sub process_pair {
   # N.B. %opts includes "origpathN" and "pathN" (the latter refers to a csv),
   # "sheetnameN", and "labelN".
-  # "sheetname_header" is "" or "title...\n" to print before the first diff.
+  # "sheetname_str" is "" or "title...\n" to print before the first diff.
   # ---- Read data into memory, delete ignored columns, etc. ----
   my $obj = main::Differ->new( %opts );
 
@@ -615,7 +614,9 @@ sub new {
                            quote_char   => $hash{quote_char},
                            sep_char     => $hash{sep_char},
                            encoding     => $hash{encoding},
-                           silent       => $hash{silent},
+                           silent  => $hash{silent},
+                           verbose => $hash{debug},
+                           debug   => $hash{debug},
                            (defined($title_row_spec)
                              ? $title_row_spec == 0
                                ? (title_rx => undef)
@@ -1148,7 +1149,13 @@ sub compare_native {
   my $changed = $self->_native_output(\@cxlist1, \@cxlist2, $diff, 1);
 
   if ($changed) {
-    print $self->{sheetname_header};  # possibly ""
+    if ($self->{sheetname_str} ne "") {
+      my $wid = length($self->{sheetname_str});
+      my $sep = "*" x (10 + $wid + 4);
+      print "\n$sep\n";
+      print "*** SHEET ",$self->{sheetname_str}, " ***\n";
+      print "$sep\n";
+    }
     $diff->Reset;
     my $changed2 = $self->_native_output(\@cxlist1, \@cxlist2, $diff, 0);
     oops if $changed2 != $changed;
@@ -1397,8 +1404,8 @@ sub compare_using_diff {
 #  # With standard diff, we have no way to suppress the header if there are
 #  # no diffs, so always print it (it will be "" if no header is ever
 #  # appropraite).
-#  confess "bug" unless defined $self->{sheetname_header};
-#  print $self->{sheetname_header};
+#  confess "bug" unless defined $self->{sheetname_str};
+#  print $self->{sheetname_str};
 
   # Write the possibly-edited-for-visibiliity data to temp .csv files,
   # and create symlinks to these csv files for using human-friendly names
