@@ -7,8 +7,12 @@ use t_TestCommon qw/bug run_perlscript/; # Test2::V0 etc.
 use t_dsUtils qw/runtest $progname $progpath/;
 
 use Spreadsheet::Edit::IO ();
-if (!Spreadsheet::Edit::IO::spreadsheets_ok()) {
-  plan(skip_all => "External tools (Libre Office) not installed");
+my $can_cvt_spreadsheets    = Spreadsheet::Edit::IO::can_cvt_spreadsheets();
+my $can_extract_named_sheet = Spreadsheet::Edit::IO::can_extract_named_sheet();
+my $can_extract_allsheets   = Spreadsheet::Edit::IO::can_extract_allsheets();
+
+if (!$can_extract_named_sheet) {
+  plan(skip_all => "External tools (Libre Office) not installed or too old");
 }
 
 my $tlib = "$Bin/../tlib";

@@ -434,6 +434,7 @@ sub process_pair {
     }
     warn "> Paired sheets contain identical data, skipping fancier algos\n"
       if $opts{debug};
+warn dvis '## $rows1\n   $rows2\n' if $opts{debug};
     return 0
   }
 

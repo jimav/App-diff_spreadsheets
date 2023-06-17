@@ -8,8 +8,12 @@ use t_dsUtils qw/runtest $progname $progpath/;
 
 use File::Which qw/which/;
 use Spreadsheet::Edit::IO ();
-if (!Spreadsheet::Edit::IO::spreadsheets_ok()) {
-  plan(skip_all => "External tools (Libre Office) not installed");
+my $can_cvt_spreadsheets    = Spreadsheet::Edit::IO::can_cvt_spreadsheets();
+my $can_extract_named_sheet = Spreadsheet::Edit::IO::can_extract_named_sheet();
+my $can_extract_allsheets   = Spreadsheet::Edit::IO::can_extract_allsheets();
+
+if (!$can_extract_named_sheet) {
+  plan(skip_all => "External tools (Libre Office) not installed or too old");
 }
 elsif (! which("git")) {
   plan(skip_all => "git is not installed");
