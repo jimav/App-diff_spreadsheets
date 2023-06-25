@@ -110,9 +110,10 @@ my $maxwidth = do{
     $ENV{COLUMNS}
   : do{
       my $wmsg = ""; # Suppress hard-coded "didn't work" from Term::ReadKey
+                     #  or "stty: standard input: Not a tty" etc.
       local $SIG{'__WARN__'} = sub { $wmsg .= $_[0] };
       my ($width, $height) = Term::ReadKey::GetTerminalSize(*STDOUT);
-      warn $wmsg if $wmsg && $wmsg !~ /did.*n.*work/i;
+      #warn $wmsg if $wmsg && $wmsg !~ /did.*n.*work/i;
       $width // 80
     }
 };
