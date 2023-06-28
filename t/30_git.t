@@ -7,7 +7,7 @@ use t_TestCommon qw/bug run_perlscript/; # Test2::V0 etc.
 use t_dsUtils qw/runtest $progname $progpath/;
 
 use File::Which qw/which/;
-use Spreadsheet::Edit::IO ();
+use Spreadsheet::Edit::IO 1000.001 ();
 my $can_cvt_spreadsheets    = Spreadsheet::Edit::IO::can_cvt_spreadsheets();
 my $can_extract_named_sheet = Spreadsheet::Edit::IO::can_extract_named_sheet();
 my $can_extract_allsheets   = Spreadsheet::Edit::IO::can_extract_allsheets();
