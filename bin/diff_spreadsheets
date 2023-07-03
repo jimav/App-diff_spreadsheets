@@ -103,20 +103,29 @@ sub badargs_exit(@) {
 #my $rightarrow = "\N{RIGHTWARDS ARROW}\N{NARROW NO-BREAK SPACE}";
 #my $rightarrow = "\N{RIGHTWARDS ARROW}\N{HAIR SPACE}";
 
-# 0 or undef to not wrap long lines
-my $maxwidth = do{
-  u($ENV{COLUMNS}) =~ /^[1-9]\d*$/
-  ? # Overrides actual terminal width; needed for testing
-    $ENV{COLUMNS}
-  : do{
-      my $wmsg = ""; # Suppress hard-coded "didn't work" from Term::ReadKey
-                     #  or "stty: standard input: Not a tty" etc.
+sub _get_terminal_width() {  # returns undef if unknowable
+  if (u($ENV{COLUMNS}) =~ /^[1-9]\d*$/) {
+    return $ENV{COLUMNS}; # overrides actual terminal width
+  } else {
+    local *_; # Try to avoid clobbering special filehandle "_"
+    # This does not actualy work; https://github.com/Perl/perl5/issues/19142
+
+    my $fh = -t STDERR ? *STDERR : 
+             -t STDOUT ? *STDOUT :
+             -t STDIN  ? *STDIN  :
+        do{my $fh; for("/dev/tty",'CONOUT$') { last if open $fh, $_ } $fh} ;
+    my $wmsg = ""; # Suppress hard-coded "didn't work" from Term::ReadKey
+                   #  or "stty: standard input: Not a tty" etc.
+    my ($width, $height) = do {
       local $SIG{'__WARN__'} = sub { $wmsg .= $_[0] };
-      my ($width, $height) = Term::ReadKey::GetTerminalSize(*STDOUT);
-      #warn $wmsg if $wmsg && $wmsg !~ /did.*n.*work/i;
-      $width // 80
-    }
-};
+      $fh ? Term::ReadKey::GetTerminalSize($fh) : ()
+    };
+    return $width; # possibly undef
+  }
+}
+
+# 0 or undef to not wrap long lines
+my $maxwidth = _get_terminal_width // 80;
 
 my %opts = (
   sort_rows       => 1,
