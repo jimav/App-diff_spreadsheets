@@ -17,7 +17,7 @@ use feature qw(unicode_strings unicode_eval evalbytes);
 no warnings "experimental::lexical_subs";
 
 use Carp; $Carp::MaxArgNums = 0;
-use Data::Dumper::Interp 6.005;
+use Data::Dumper::Interp 6.006;
 use File::Basename qw(basename dirname fileparse);
 use File::Path qw(make_path remove_tree);
 use File::Temp qw(tempfile tempdir);
@@ -31,7 +31,7 @@ use List::Util qw/min max any first/;
 use List::MoreUtils qw/indexes/;
 use Scalar::Util qw/openhandle/;
 use Pod::Usage qw/pod2usage/;
-use Spreadsheet::Edit qw(title2ident);
+use Spreadsheet::Edit 1000.006 qw(title2ident);
 use Spreadsheet::Edit::IO qw/convert_spreadsheet
              sheetname_from_spec filepath_from_spec form_spec_with_sheetname/;
 use Term::ReadKey ();
@@ -499,8 +499,8 @@ use File::Basename qw(basename dirname fileparse);
 use File::Path qw(make_path remove_tree);
 use File::Spec::Functions qw(canonpath catfile catdir rootdir tmpdir);
 use List::Util qw(min max any first);
-use Spreadsheet::Edit qw(:DEFAULT logmsg cx2let let2cx);
-use Data::Dumper::Interp 6.005;
+use Spreadsheet::Edit 1000.006 qw(:DEFAULT logmsg cx2let let2cx);
+use Data::Dumper::Interp 6.006;
 sub oops(@) { unshift @_, "oops "; require Carp; goto &Carp::confess; }
 
 sub _visualize($);
