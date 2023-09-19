@@ -43,7 +43,7 @@ my $empty = Path::Tiny->tempfile(); $empty->spew("");
 
   ok($out eq "", "$progname sans args -> silent on stdout but...",
        dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
-    
+
   like($err, qr/Usage/, "$progname sans args -> Usage on stderr",
          dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
 }
@@ -54,14 +54,18 @@ my $empty = Path::Tiny->tempfile(); $empty->spew("");
   # so check for other text
   #like($out, qr/NAME.*SYNOPSIS.*OPTIONS/s, "$progname -h => Extended help on stdout",
   #       dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
-  like($out, qr/diff_spreadsheet.*OPTION/s, "$progname -h => Extended help on stdout",
-         dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
+  like($out,
+       qr/diff_spreadsheet.*OPTION/s, "$progname -h => Extended help on stdout",
+       dvis '\nOUT:$out\nERR:$err\n  ', sprintf("  wstat=%04x\n", $wstat)
+      );
 
   if ($debug) {
      warn "Out:$out\nErr:$err\n";
   } else {
-    ok($err eq "", "$progname -h => nothing on stderr",
-         dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
+    ok(($err eq "" or $err =~ /does not map.*Pod/s),
+       "$progname -h => nothing on stderr (except pod encode errors)",
+       dvis '\nOUT:$out\nERR:$err\n  ', sprintf("  wstat=%04x\n", $wstat)
+      );
   }
 }
 
@@ -73,7 +77,7 @@ my $empty = Path::Tiny->tempfile(); $empty->spew("");
   };
   ok($out eq "", "$progname diags should only be on stderr",
        dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
-  
+
   like($err, qr/\Q$nepath\E.*(missing|no such)/i, "$progname catches non-existent file",
        dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
 }
