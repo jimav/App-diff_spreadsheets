@@ -8,6 +8,8 @@ use t_TestCommon qw/bug run_perlscript $silent $debug/; # Test2::V0 etc.
 use Capture::Tiny qw/capture/;
 use Env qw/@PERL5LIB/; # ties @PERL5LIB
 
+my @debug_opt = $debug ? ('--debug') : ();
+
 my $progname = "diff_spreadsheets";
 my $progpath = path("$Bin/../bin/$progname")->canonpath;
 
@@ -34,7 +36,7 @@ my $empty = Path::Tiny->tempfile(); $empty->spew("");
 #   Can't load '/opt/perl-5.37.10/lib/5.37.10/x86_64-linux/auto/Fcntl/Fcntl.so'
 # What is going on???
 
-{ my $wstat = run_perlscript $progpath, $empty, $empty;
+{ my $wstat = run_perlscript $progpath, @debug_opt, $empty, $empty;
   ok($wstat==0, "status==0 for $progname emptyfile emptyfile");
 }
 
@@ -73,13 +75,20 @@ my $empty = Path::Tiny->tempfile(); $empty->spew("");
 { my $nepath = " non existent file .csv";
   my ($out, $err, $wstat) = capture {
     die "oops" if -e $nepath;
-    run_perlscript $progpath, $empty, $nepath;
+    run_perlscript $progpath, @debug_opt, $empty, $nepath;
   };
-  ok($out eq "", "$progname diags should only be on stderr",
-       dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
+  if ($debug) {
+    say dvis 'STDOUT:$out\nSTDERR:$err\nWSTAT=', sprintf("%04x\n", $wstat);
+  } else {
+    ok($out eq "", "$progname diags should only be on stderr",
+       dvis 'STDOUT:$out\nSTDERR:$err\nWSTAT=', sprintf("%04x\n", $wstat));
 
-  like($err, qr/\Q$nepath\E.*(missing|no such)/i, "$progname catches non-existent file",
-       dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
+    like($err,
+         qr/\Q$nepath\E.*(missing|no such)/i,
+         "$progname catches non-existent file",
+           dvis '\n  $out\n  $err\n  ', sprintf("  wstat=%04x\n", $wstat));
+  }
+  isnt($wstat, 0, "Non-zero exit status");
 }
 
 done_testing;
