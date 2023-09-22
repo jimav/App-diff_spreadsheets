@@ -441,7 +441,7 @@ sub process_pair {
     for my $rx (0..$#$rows1) {
       my $r1 = $rows1->[$rx];
       my $r2 = $rows2->[$rx];
-      last PRECHECK if first { $r1->[$_] ne $r2->[$_] } 0..($num_cols-1)
+      last PRECHECK if defined first {$r1->[$_] ne $r2->[$_]} 0..($num_cols-1);
     }
     warn "> Paired sheets contain identical data, skipping fancier algos\n"
       if $opts{debug};
@@ -502,6 +502,7 @@ use List::Util qw(min max any first);
 use Guard qw(guard scope_guard);
 use Spreadsheet::Edit 1000.006 qw(:DEFAULT logmsg cx2let let2cx);
 use Data::Dumper::Interp 6.007;
+use Spreadsheet::Edit::Log ':btw=DS ${lno}:';
 
 sub _visualize($);
 sub _title_or_origABC($$);
@@ -1606,7 +1607,11 @@ is detected as a CHANGE and not as confusing separate DELETE and INSERT.
 
 B<C<--no-sort-rows>> disables this sorting so you can pre-sort the
 data yourself (for example, if "id columns" should be sorted
-numerically).
+numerically) or if detecting different row order is necessary.
+
+Note: With sorting, I<diffs will not be detected> if rows are in a different
+order but otherwise unchanged.   Use C<--no-sort-rows> if row order is
+important.
 
 When using the default "native" diff algorithm, the I<original>
 row numbers in each file are displayed in the results, hiding
