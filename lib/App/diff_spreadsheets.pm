@@ -5,6 +5,7 @@
 # Attribution is requested but is not required.
 
 package App::diff_spreadsheets;
+use strict; use warnings;  # placate Test::kwalitee
 
 # DATE
 # VERSION
