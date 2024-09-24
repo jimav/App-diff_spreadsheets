@@ -671,6 +671,7 @@ sub new {
       eval {
         $sh->title_rx( { required => [compile_if_regex
                                  @$always_show_columns,@$id_columns,@columns],
+                         silent => 1, # don't show conflicts with letter codes
                        },
                        "auto"
                      );

@@ -1,3 +1,4 @@
+v1.027 - Suppress warnings about ABC letter codes clashing with Titles.
 v1.026 - Un-do 1.025 changes and use robust term width detector code.
          Default to "no titles" if auto-detect fails.
 v1.025 - Set fixed COLUMNS to avoid tester issues with no terminal
